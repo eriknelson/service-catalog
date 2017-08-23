@@ -215,6 +215,11 @@ func DeepCopy_servicecatalog_ServiceBrokerSpec(in interface{}, out interface{}, 
 			*out = make([]byte, len(*in))
 			copy(*out, *in)
 		}
+		if in.SyncDuration != nil {
+			in, out := &in.SyncDuration, &out.SyncDuration
+			*out = new(meta_v1.Duration)
+			**out = **in
+		}
 		return nil
 	}
 }

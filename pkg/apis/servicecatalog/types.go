@@ -60,7 +60,26 @@ type ServiceBrokerSpec struct {
 	// CABundle is a PEM encoded CA bundle which will be used to validate a Broker's serving certificate.
 	// +optional
 	CABundle []byte `json:"caBundle,omitempty"`
+
+	// Syncing mode; either "Duration" or "Manual"
+	// "Duration" - allows setting of SyncDuration field, specifying frequency of sync
+	// "Manual" - Catalog requires a manual trigger to sync with broker server
+	SyncBehavior BrokerSyncBehavior `json:"syncBehavior"`
+
+	// The frequency by which the controller re-syncs with the broker server.
+	SyncDuration *metav1.Duration `json:"syncDuration"`
+
+	// Strictly increasing integer counter that can be manually incremented by
+	// a user to manually trigger a re-sync
+	RelistRequests int
 }
+
+type BrokerSyncBehavior string
+
+const (
+	BrokerSyncBehaviorDuration BrokerSyncBehavior = "Duration"
+	BrokerSyncBehaviorManual   BrokerSyncBehavior = "Manual"
+)
 
 // ServiceBrokerAuthInfo is a union type that contains information on one of the authentication methods
 // the the service catalog and brokers may support, according to the OpenServiceBroker API

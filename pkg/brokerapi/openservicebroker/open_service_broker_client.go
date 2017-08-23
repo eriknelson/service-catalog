@@ -111,7 +111,9 @@ func NewClient(name, url, username, password string) brokerapi.BrokerClient {
 }
 
 func (c *openServiceBrokerClient) GetCatalog() (*brokerapi.Catalog, error) {
+	glog.Info("NSK: Catalog calling GetCatalog!")
 	catalogURL := fmt.Sprintf(catalogFormatString, c.url)
+	glog.Infof("NSK: Catalog calling GetCatalog, URL -> %s", catalogURL)
 
 	req, err := c.newOSBRequest(http.MethodGet, catalogURL, nil, nil)
 	if err != nil {
