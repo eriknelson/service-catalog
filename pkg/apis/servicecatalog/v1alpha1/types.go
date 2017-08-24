@@ -64,12 +64,13 @@ type ServiceBrokerSpec struct {
 	// SyncBehavior specifies the type of sync behavior the catalog should exhibit
 	// when syncing ServiceClasses available from a broker
 	SyncBehavior ServiceBrokerSyncBehavior `json:"syncBehavior"`
-	// SyncDuration is the frequency by which a controller will sync with the broker
-	// when the SyncBehavior is set to BrokerSyncBehaviorDuration
-	SyncDuration *metav1.Duration `json:"syncDuration"`
-	// SyncRequests is a strictly increasing integer counter that can be manually incremented
-	// by a user to manually trigger a sync
-	SyncRequests int64 `json:"syncRequests"`
+
+	//// SyncDuration is the frequency by which a controller will sync with the broker
+	//// when the SyncBehavior is set to BrokerSyncBehaviorDuration
+	//SyncDuration *metav1.Duration `json:"syncDuration"`
+	//// SyncRequests is a strictly increasing integer counter that can be manually incremented
+	//// by a user to manually trigger a sync
+	//SyncRequests int64 `json:"syncRequests"`
 }
 
 // ServiceBrokerSyncBehavior represents a type of broker sync behavior
