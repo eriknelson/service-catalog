@@ -78,7 +78,7 @@ func TestSetDefaultServiceBroker(t *testing.T) {
 	}
 
 	incorrectDefaultSyncBehavior := b2.Spec.SyncBehavior != "" &&
-		b2.Spec.SyncBehavior != ServiceBrokerSyncBehaviorDuration
+		b2.Spec.SyncBehavior != versioned.ServiceBrokerSyncBehaviorDuration
 	if incorrectDefaultSyncBehavior {
 		t.Error("Expected a default SyncBehavior of ServiceBrokerSyncBehaviorDuration, but got something else")
 	}

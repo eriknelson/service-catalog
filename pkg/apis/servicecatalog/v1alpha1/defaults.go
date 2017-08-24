@@ -29,10 +29,10 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 
 func SetDefaults_ServiceBrokerSpec(spec *ServiceBrokerSpec) {
 	if spec.SyncBehavior == "" {
-		spec.SyncBehavior = ServiceBrokerSyncDuration
+		spec.SyncBehavior = ServiceBrokerSyncBehaviorDuration
 	}
 
-	if spec.SyncBehavior == ServiceBrokerSyncDuration {
+	if spec.SyncBehavior == ServiceBrokerSyncBehaviorDuration {
 		spec.SyncDuration = &metav1.Duration{15 * time.Minute}
 	}
 }
