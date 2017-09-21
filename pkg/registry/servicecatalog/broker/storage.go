@@ -104,7 +104,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 
 // NewStorage creates a new rest.Storage responsible for accessing ServiceInstance
 // resources
-func NewStorage(opts server.Options) (brokers, brokersStatus rest.Storage) {
+func NewStorage(opts server.Options) (brokers, brokersStatus, brokersRelist rest.Storage) {
 	prefix := "/" + opts.ResourcePrefix()
 
 	storageInterface, dFunc := opts.GetStorage(
@@ -143,5 +143,8 @@ func NewStorage(opts server.Options) (brokers, brokersStatus rest.Storage) {
 	statusStore := store
 	statusStore.UpdateStrategy = brokerStatusUpdateStrategy
 
-	return &store, &statusStore
+	relistStore := store
+	relistStore.UpdateStrategy = brokerRelistUpdateStrategy
+
+	return &store, &statusStore, &relistStore
 }

@@ -158,3 +158,12 @@ func ValidateServiceBrokerStatusUpdate(new *sc.ServiceBroker, old *sc.ServiceBro
 	allErrs = append(allErrs, ValidateServiceBrokerUpdate(new, old)...)
 	return allErrs
 }
+
+// ValidateServiceBrokerRelist Update checks that when relisting a ServiceBroker,
+// the RelistRequests count is strictly increasing.
+func ValidateServiceBrokerRelistUpdate(new *sc.ServiceBroker, old *sc.ServiceBroker) field.ErrorList {
+	allErrs := field.ErrorList{}
+	// ERIK TODO: Assert that RelistRequests is strictly increasing?
+	//allErrs = append(allErrs, ValidateServiceBrokerUpdate(new, old)...)
+	return allErrs
+}
