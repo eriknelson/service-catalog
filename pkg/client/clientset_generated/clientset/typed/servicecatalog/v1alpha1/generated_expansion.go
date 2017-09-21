@@ -16,8 +16,6 @@ limitations under the License.
 
 package v1alpha1
 
-type ClusterServiceBrokerExpansion interface{}
-
 type ClusterServiceClassExpansion interface{}
 
 type ClusterServicePlanExpansion interface{}
