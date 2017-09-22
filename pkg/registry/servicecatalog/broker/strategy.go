@@ -180,8 +180,17 @@ func (brokerStatusRESTStrategy) ValidateUpdate(ctx genericapirequest.Context, ne
 	return scv.ValidateServiceBrokerStatusUpdate(newServiceBroker, oldServiceBroker)
 }
 
+func (r *RelistREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+	glog.V(3).Infof("NSK: RelistREST::Update")
+	glog.V(3).Infof("NSK name: [ %v ]", name)
+	glog.V(3).Infof("NSK objInfo: %v", objInfo)
+
+	return r.store.Update(ctx, name, objInfo)
+}
+
 func (brokerRelistRESTStrategy) PrepareForUpdate(ctx genericapirequest.Context, new, old runtime.Object) {
-	// ERIK TODO: Is relist subresource actually expecting a broker object?
+	glog.V(3).Infof("NSK: brokerRelistRESTStrategy::PrepareForUpdate")
+	// ERIK TODO: Is this at all the appropriate place to do this?
 
 	newServiceBroker, ok := new.(*sc.ServiceBroker)
 	if !ok {
@@ -192,11 +201,11 @@ func (brokerRelistRESTStrategy) PrepareForUpdate(ctx genericapirequest.Context, 
 		glog.Fatal("received a non-broker object to update from")
 	}
 
-	// relist updates are not allowed to update spec
 	newServiceBroker.Spec = oldServiceBroker.Spec
-	// ERIK TODO: Status?
+	newServiceBroker.Status = oldServiceBroker.Status
 
-	// ERIK TODO: Increment relistRequests here?
+	// ERIK TODO: Is this even appropriate?
+	//newServiceBroker.Spec.RelistRequests = oldServiceBroker.Spec.RelistRequests + 1
 }
 
 func (brokerRelistRESTStrategy) ValidateUpdate(ctx genericapirequest.Context, new, old runtime.Object) field.ErrorList {

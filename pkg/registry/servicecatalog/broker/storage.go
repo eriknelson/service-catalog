@@ -102,6 +102,16 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	return labels.Set(broker.ObjectMeta.Labels), toSelectableFields(broker), broker.Initializers != nil, nil
 }
 
+type RelistREST struct {
+	store *registry.Store
+}
+
+var _ rest.Updater = &RelistREST{}
+
+func (r *RelistREST) New() runtime.Object {
+	return r.store.New()
+}
+
 // NewStorage creates a new rest.Storage responsible for accessing ServiceInstance
 // resources
 func NewStorage(opts server.Options) (brokers, brokersStatus, brokersRelist rest.Storage) {
@@ -146,5 +156,5 @@ func NewStorage(opts server.Options) (brokers, brokersStatus, brokersRelist rest
 	relistStore := store
 	relistStore.UpdateStrategy = brokerRelistUpdateStrategy
 
-	return &store, &statusStore, &relistStore
+	return &store, &statusStore, &RelistREST{&relistStore}
 }
