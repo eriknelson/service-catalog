@@ -181,17 +181,10 @@ func (brokerStatusRESTStrategy) ValidateUpdate(ctx genericapirequest.Context, ne
 }
 
 func (r *RelistREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	glog.V(3).Infof("NSK: RelistREST::Update")
-	glog.V(3).Infof("NSK name: [ %v ]", name)
-	glog.V(3).Infof("NSK objInfo: %v", objInfo)
-
 	return r.store.Update(ctx, name, objInfo)
 }
 
 func (brokerRelistRESTStrategy) PrepareForUpdate(ctx genericapirequest.Context, new, old runtime.Object) {
-	glog.V(3).Infof("NSK: brokerRelistRESTStrategy::PrepareForUpdate")
-	// ERIK TODO: Is this at all the appropriate place to do this?
-
 	newServiceBroker, ok := new.(*sc.ServiceBroker)
 	if !ok {
 		glog.Fatal("received a non-broker object to update to")
@@ -203,9 +196,7 @@ func (brokerRelistRESTStrategy) PrepareForUpdate(ctx genericapirequest.Context, 
 
 	newServiceBroker.Spec = oldServiceBroker.Spec
 	newServiceBroker.Status = oldServiceBroker.Status
-
-	// ERIK TODO: Is this even appropriate?
-	//newServiceBroker.Spec.RelistRequests = oldServiceBroker.Spec.RelistRequests + 1
+	newServiceBroker.Spec.RelistRequests = oldServiceBroker.Spec.RelistRequests + 1
 }
 
 func (brokerRelistRESTStrategy) ValidateUpdate(ctx genericapirequest.Context, new, old runtime.Object) field.ErrorList {

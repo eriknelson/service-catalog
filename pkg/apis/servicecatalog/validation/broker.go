@@ -163,7 +163,13 @@ func ValidateServiceBrokerStatusUpdate(new *sc.ServiceBroker, old *sc.ServiceBro
 // the RelistRequests count is strictly increasing.
 func ValidateServiceBrokerRelistUpdate(new *sc.ServiceBroker, old *sc.ServiceBroker) field.ErrorList {
 	allErrs := field.ErrorList{}
-	// ERIK TODO: Assert that RelistRequests is strictly increasing?
-	//allErrs = append(allErrs, ValidateServiceBrokerUpdate(new, old)...)
+
+	if new.Spec.RelistRequests <= old.Spec.RelistRequests {
+		msg := "relisted ServiceBroker must increment relistRequests field"
+		fldPath := field.NewPath("spec").Child("relistRequests")
+		allErrs = append(allErrs, field.Invalid(fldPath, new.Spec.RelistRequests, msg))
+	}
+
+	allErrs = append(allErrs, ValidateServiceBrokerUpdate(new, old)...)
 	return allErrs
 }
