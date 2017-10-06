@@ -20,16 +20,16 @@ import (
 	"github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1alpha1"
 )
 
-// ServiceBrokerExpansion interface allows relisting a ServiceBroker
-type ServiceBrokerExpansion interface {
-	Relist(servicebroker *v1alpha1.ServiceBroker) (*v1alpha1.ServiceBroker, error)
+// ClusterServiceBrokerExpansion interface allows relisting a ClusterServiceBroker
+type ClusterServiceBrokerExpansion interface {
+	Relist(servicebroker *v1alpha1.ClusterServiceBroker) (*v1alpha1.ClusterServiceBroker, error)
 }
 
-func (c *serviceBrokers) Relist(serviceBroker *v1alpha1.ServiceBroker) (result *v1alpha1.ServiceBroker, err error) {
-	result = &v1alpha1.ServiceBroker{}
+func (c *clusterServiceBrokers) Relist(serviceBroker *v1alpha1.ClusterServiceBroker) (result *v1alpha1.ClusterServiceBroker, err error) {
+	result = &v1alpha1.ClusterServiceBroker{}
 	err = c.client.Put().
 		Namespace(serviceBroker.Namespace).
-		Resource("servicebrokers").
+		Resource("clusterservicebrokers").
 		Name(serviceBroker.Name).
 		SubResource("relist").
 		Body(serviceBroker).

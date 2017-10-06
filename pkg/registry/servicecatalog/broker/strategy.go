@@ -185,11 +185,11 @@ func (r *RelistREST) Update(ctx genericapirequest.Context, name string, objInfo 
 }
 
 func (brokerRelistRESTStrategy) PrepareForUpdate(ctx genericapirequest.Context, new, old runtime.Object) {
-	newServiceBroker, ok := new.(*sc.ServiceBroker)
+	newServiceBroker, ok := new.(*sc.ClusterServiceBroker)
 	if !ok {
 		glog.Fatal("received a non-broker object to update to")
 	}
-	oldServiceBroker, ok := old.(*sc.ServiceBroker)
+	oldServiceBroker, ok := old.(*sc.ClusterServiceBroker)
 	if !ok {
 		glog.Fatal("received a non-broker object to update from")
 	}
@@ -210,14 +210,14 @@ func (brokerRelistRESTStrategy) PrepareForUpdate(ctx genericapirequest.Context, 
 }
 
 func (brokerRelistRESTStrategy) ValidateUpdate(ctx genericapirequest.Context, new, old runtime.Object) field.ErrorList {
-	newServiceBroker, ok := new.(*sc.ServiceBroker)
+	newServiceBroker, ok := new.(*sc.ClusterServiceBroker)
 	if !ok {
 		glog.Fatal("received a non-broker object to validate to")
 	}
-	oldServiceBroker, ok := old.(*sc.ServiceBroker)
+	oldServiceBroker, ok := old.(*sc.ClusterServiceBroker)
 	if !ok {
 		glog.Fatal("received a non-broker object to validate from")
 	}
 
-	return scv.ValidateServiceBrokerRelistUpdate(newServiceBroker, oldServiceBroker)
+	return scv.ValidateClusterServiceBrokerRelistUpdate(newServiceBroker, oldServiceBroker)
 }

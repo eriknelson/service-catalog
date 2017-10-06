@@ -158,9 +158,9 @@ func ValidateClusterServiceBrokerStatusUpdate(new *sc.ClusterServiceBroker, old 
 	return allErrs
 }
 
-// ValidateServiceBrokerRelistUpdate checks that when relisting a ServiceBroker,
+// ValidateClusterServiceBrokerRelistUpdate checks that when relisting a ClusterServiceBroker,
 // the RelistRequests count is strictly increasing.
-func ValidateServiceBrokerRelistUpdate(new *sc.ServiceBroker, old *sc.ServiceBroker) field.ErrorList {
+func ValidateClusterServiceBrokerRelistUpdate(new *sc.ClusterServiceBroker, old *sc.ClusterServiceBroker) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if old.Spec.RelistRequests == sc.ServiceBrokerRelistRequestsMax {
@@ -177,6 +177,6 @@ func ValidateServiceBrokerRelistUpdate(new *sc.ServiceBroker, old *sc.ServiceBro
 		}
 	}
 
-	allErrs = append(allErrs, ValidateServiceBrokerUpdate(new, old)...)
+	allErrs = append(allErrs, ValidateClusterServiceBrokerUpdate(new, old)...)
 	return allErrs
 }
