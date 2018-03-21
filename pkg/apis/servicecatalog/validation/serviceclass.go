@@ -90,7 +90,7 @@ func ValidateServiceClass(serviceclass *sc.ServiceClass) field.ErrorList {
 
 // ValidateServiceClassUpdate checks that when changing from an older
 // ServiceClass to a newer ServiceClass is okay.
-func ValidateClusterServiceClassUpdate(new *sc.ServiceClass, old *sc.ServiceClass) field.ErrorList {
+func ValidateServiceClassUpdate(new *sc.ServiceClass, old *sc.ServiceClass) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, internalValidateServiceClass(new)...)
 
@@ -121,7 +121,7 @@ func internalValidateServiceClass(serviceclass *sc.ServiceClass) field.ErrorList
 			validateCommonServiceClassName,
 			field.NewPath("metadata"))...)
 
-	allErrs = append(allErrs, validateClusterServiceClassSpec(&serviceclass.Spec, field.NewPath("spec"), true)...)
+	allErrs = append(allErrs, validateServiceClassSpec(&serviceclass.Spec, field.NewPath("spec"), true)...)
 	return allErrs
 }
 
@@ -132,7 +132,7 @@ func validateClusterServiceClassSpec(spec *sc.ClusterServiceClassSpec, fldPath *
 		allErrs = append(allErrs, field.Required(fldPath.Child("clusterServiceBrokerName"), "clusterServiceBrokerName is required"))
 	}
 
-	commonErrs = validateCommonServiceClassSpec(spec.CommonServiceClassSpec, fldPath, create)
+	commonErrs := validateCommonServiceClassSpec(&spec.CommonServiceClassSpec, fldPath, create)
 
 	if len(allErrs) != 0 {
 		allErrs = append(commonErrs)
@@ -148,7 +148,7 @@ func validateServiceClassSpec(spec *sc.ServiceClassSpec, fldPath *field.Path, cr
 		allErrs = append(allErrs, field.Required(fldPath.Child("serviceBrokerName"), "serviceBrokerName is required"))
 	}
 
-	commonErrs = validateCommonServiceClassSpec(spec.CommonServiceClassSpec, fldPath, create)
+	commonErrs := validateCommonServiceClassSpec(&spec.CommonServiceClassSpec, fldPath, create)
 
 	if len(allErrs) != 0 {
 		allErrs = append(commonErrs)
