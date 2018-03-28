@@ -168,8 +168,8 @@ func (p StorageProvider) v1beta1Storage(
 	}
 
 	storageMap := map[string]rest.Storage{
-		"clusterservicebrokers":        brokerStorage,
-		"clusterservicebrokers/status": brokerStatusStorage,
+		"clusterservicebrokers":        clusterServiceBrokerStorage,
+		"clusterservicebrokers/status": clusterServiceBrokerStatusStorage,
 		"clusterserviceclasses":        clusterServiceClassStorage,
 		"clusterserviceclasses/status": clusterServiceClassStatusStorage,
 		"clusterserviceplans":          servicePlanStorage,
