@@ -25,6 +25,7 @@ import (
 	"github.com/kubernetes-incubator/service-catalog/pkg/registry/servicecatalog/clusterserviceclass"
 	"github.com/kubernetes-incubator/service-catalog/pkg/registry/servicecatalog/instance"
 	"github.com/kubernetes-incubator/service-catalog/pkg/registry/servicecatalog/server"
+	"github.com/kubernetes-incubator/service-catalog/pkg/registry/servicecatalog/servicebroker"
 	"github.com/kubernetes-incubator/service-catalog/pkg/registry/servicecatalog/serviceclass"
 	"github.com/kubernetes-incubator/service-catalog/pkg/registry/servicecatalog/serviceplan"
 	"github.com/kubernetes-incubator/service-catalog/pkg/storage/etcd"
@@ -187,6 +188,11 @@ func (p StorageProvider) v1beta1Storage(
 			return nil, err
 		}
 
+		serviceBrokerRESTOptions, err := restOptionsGetter.GetRESTOptions(servicecatalog.Resource("servicebrokers"))
+		if err != nil {
+			return nil, err
+		}
+
 		serviceClassOpts := server.NewOptions(
 			etcd.Options{
 				RESTOptions:   serviceClassRESTOptions,
@@ -200,10 +206,26 @@ func (p StorageProvider) v1beta1Storage(
 			p.StorageType,
 		)
 
+		serviceBrokerOpts := server.NewOptions(
+			etcd.Options{
+				RESTOptions:   serviceBrokerRESTOptions,
+				Capacity:      1000,
+				ObjectType:    servicebroker.EmptyObject(),
+				ScopeStrategy: servicebroker.NewScopeStrategy(),
+				NewListFunc:   servicebroker.NewList,
+				GetAttrsFunc:  servicebroker.GetAttrs,
+				Trigger:       storage.NoTriggerPublisher,
+			},
+			p.StorageType,
+		)
+
 		serviceClassStorage, serviceClassStatusStorage := serviceclass.NewStorage(*serviceClassOpts)
+		serviceBrokerStorage, serviceBrokerStatusStorage := servicebroker.NewStorage(*serviceBrokerOpts)
 
 		storageMap["serviceclasses"] = serviceClassStorage
 		storageMap["serviceclasses/status"] = serviceClassStatusStorage
+		storageMap["servicebrokers"] = serviceBrokerStorage
+		storageMap["servicebrokers/status"] = serviceBrokerStatusStorage
 	}
 
 	return storageMap, nil
