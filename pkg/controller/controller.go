@@ -94,8 +94,8 @@ func NewController(
 		recorder:                    recorder,
 		reconciliationRetryDuration: reconciliationRetryDuration,
 		brokerQueue:                 workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-broker"),
-		serviceClassQueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-class"),
-		servicePlanQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-plan"),
+		serviceClassQueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cluster-service-class"),
+		clusterServicePlanQueue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-plan"),
 		instanceQueue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-instance"),
 		bindingQueue:                workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-binding"),
 		instancePollingQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(pollingStartInterval, operationPollingMaximumBackoffDuration), "instance-poller"),
@@ -118,11 +118,11 @@ func NewController(
 		DeleteFunc: controller.serviceClassDelete,
 	})
 
-	controller.servicePlanLister = clusterServicePlanInformer.Lister()
+	controller.clusterServicePlanLister = clusterServicePlanInformer.Lister()
 	clusterServicePlanInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    controller.servicePlanAdd,
-		UpdateFunc: controller.servicePlanUpdate,
-		DeleteFunc: controller.servicePlanDelete,
+		AddFunc:    controller.clusterServicePlanAdd,
+		UpdateFunc: controller.clusterServicePlanUpdate,
+		DeleteFunc: controller.clusterServicePlanDelete,
 	})
 
 	controller.instanceLister = instanceInformer.Lister()
@@ -160,14 +160,14 @@ type controller struct {
 	serviceClassLister          listers.ClusterServiceClassLister
 	instanceLister              listers.ServiceInstanceLister
 	bindingLister               listers.ServiceBindingLister
-	servicePlanLister           listers.ClusterServicePlanLister
+	clusterServicePlanLister    listers.ClusterServicePlanLister
 	brokerRelistInterval        time.Duration
 	OSBAPIPreferredVersion      string
 	recorder                    record.EventRecorder
 	reconciliationRetryDuration time.Duration
 	brokerQueue                 workqueue.RateLimitingInterface
 	serviceClassQueue           workqueue.RateLimitingInterface
-	servicePlanQueue            workqueue.RateLimitingInterface
+	clusterServicePlanQueue     workqueue.RateLimitingInterface
 	instanceQueue               workqueue.RateLimitingInterface
 	bindingQueue                workqueue.RateLimitingInterface
 	instancePollingQueue        workqueue.RateLimitingInterface
@@ -200,7 +200,7 @@ func (c *controller) Run(workers int, stopCh <-chan struct{}) {
 	for i := 0; i < workers; i++ {
 		createWorker(c.brokerQueue, "ClusterServiceBroker", maxRetries, true, c.reconcileClusterServiceBrokerKey, stopCh, &waitGroup)
 		createWorker(c.serviceClassQueue, "ClusterServiceClass", maxRetries, true, c.reconcileClusterServiceClassKey, stopCh, &waitGroup)
-		createWorker(c.servicePlanQueue, "ClusterServicePlan", maxRetries, true, c.reconcileClusterServicePlanKey, stopCh, &waitGroup)
+		createWorker(c.clusterServicePlanQueue, "ClusterServicePlan", maxRetries, true, c.reconcileClusterServicePlanKey, stopCh, &waitGroup)
 		createWorker(c.instanceQueue, "ServiceInstance", maxRetries, true, c.reconcileServiceInstanceKey, stopCh, &waitGroup)
 		createWorker(c.bindingQueue, "ServiceBinding", maxRetries, true, c.reconcileServiceBindingKey, stopCh, &waitGroup)
 		createWorker(c.instancePollingQueue, "InstancePoller", maxRetries, false, c.requeueServiceInstanceForPoll, stopCh, &waitGroup)
@@ -221,7 +221,7 @@ func (c *controller) Run(workers int, stopCh <-chan struct{}) {
 
 	c.brokerQueue.ShutDown()
 	c.serviceClassQueue.ShutDown()
-	c.servicePlanQueue.ShutDown()
+	c.clusterServicePlanQueue.ShutDown()
 	c.instanceQueue.ShutDown()
 	c.bindingQueue.ShutDown()
 	c.instancePollingQueue.ShutDown()
@@ -356,7 +356,7 @@ func (c *controller) getClusterServiceClassPlanAndClusterServiceBroker(instance 
 	var servicePlan *v1beta1.ClusterServicePlan
 	if instance.Spec.ClusterServicePlanRef != nil {
 		var err error
-		servicePlan, err = c.servicePlanLister.Get(instance.Spec.ClusterServicePlanRef.Name)
+		servicePlan, err = c.clusterServicePlanLister.Get(instance.Spec.ClusterServicePlanRef.Name)
 		if nil != err {
 			return nil, nil, "", nil, &operationError{
 				reason: errorNonexistentClusterServicePlanReason,
@@ -443,7 +443,7 @@ func (c *controller) getClusterServiceClassPlanAndClusterServiceBrokerForService
 		return nil, nil, "", nil, err
 	}
 
-	servicePlan, err := c.servicePlanLister.Get(instance.Spec.ClusterServicePlanRef.Name)
+	servicePlan, err := c.clusterServicePlanLister.Get(instance.Spec.ClusterServicePlanRef.Name)
 	if nil != err {
 		s := fmt.Sprintf(
 			"References a non-existent ClusterServicePlan %q - %v",
