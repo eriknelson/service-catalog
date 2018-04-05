@@ -20,65 +20,74 @@ import (
 	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
 
+	"github.com/kubernetes-incubator/service-catalog/pkg/pretty"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/tools/cache"
 )
 
-// Cluster service plan handlers and control-loop
+// Service plan handlers and control-loop
 
-func (c *controller) clusterServicePlanAdd(obj interface{}) {
+func (c *controller) servicePlanAdd(obj interface{}) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
-		glog.Errorf("ClusterServicePlan: Couldn't get key for object %+v: %v", obj, err)
+		pcb := pretty.NewContextBuilder(pretty.ServicePlan, "", "")
+		glog.Errorf(pcb.Messagef("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
-	c.clusterServicePlanQueue.Add(key)
+	c.servicePlanQueue.Add(key)
 }
 
-func (c *controller) clusterServicePlanUpdate(oldObj, newObj interface{}) {
-	c.clusterServicePlanAdd(newObj)
+func (c *controller) servicePlanUpdate(oldObj, newObj interface{}) {
+	c.servicePlanAdd(newObj)
 }
 
-func (c *controller) clusterServicePlanDelete(obj interface{}) {
-	clusterServicePlan, ok := obj.(*v1beta1.ClusterServicePlan)
-	if clusterServicePlan == nil || !ok {
+func (c *controller) servicePlanDelete(obj interface{}) {
+	servicePlan, ok := obj.(*v1beta1.ServicePlan)
+	if servicePlan == nil || !ok {
 		return
 	}
 
-	glog.V(4).Infof("ClusterServicePlan: Received delete event for %v; no further processing will occur", clusterServicePlan.Name)
+	pcb := pretty.NewContextBuilder(pretty.ServicePlan, servicePlan.ObjectMeta.Namespace, servicePlan.ObjectMeta.Name)
+	glog.V(4).Infof(pcb.Message("Received delete event, no further processing will occur"))
 }
 
-// reconcileClusterServicePlanKey reconciles a ClusterServicePlan due to resync
-// or an event on the ClusterServicePlan.  Note that this is NOT the main
-// reconciliation loop for ClusterServicePlans. ClusterServicePlans are
-// primarily reconciled in a separate flow when a ClusterServiceBroker is
+// reconcileServicePlanKey reconciles a ServicePlan due to resync
+// or an event on the ServicePlan.  Note that this is NOT the main
+// reconciliation loop for ServicePlans. ServicePlans are
+// primarily reconciled in a separate flow when a ServiceBroker is
 // reconciled.
-func (c *controller) reconcileClusterServicePlanKey(key string) error {
-	plan, err := c.clusterServicePlanLister.Get(key)
+func (c *controller) reconcileServicePlanKey(key string) error {
+	namespace, name, err := cache.SplitMetaNamespaceKey(key)
+	if err != nil {
+		return err
+	}
+	pcb := pretty.NewContextBuilder(pretty.ServicePlan, namespace, name)
+	plan, err := c.servicePlanLister.ServicePlans(namespace).Get(name)
 	if errors.IsNotFound(err) {
-		glog.Infof("ClusterServicePlan %q: Not doing work because it has been deleted", key)
+		glog.Info(pcb.Message("Not doing work because the ServicePlan has been deleted"))
 		return nil
 	}
 	if err != nil {
-		glog.Infof("ClusterServicePlan %q: Unable to retrieve object from store: %v", key, err)
+		glog.Info(pcb.Messagef("Unable to retrieve ServicePlan: %v", err))
 		return err
 	}
 
-	return c.reconcileClusterServicePlan(plan)
+	return c.reconcileServicePlan(plan)
 }
 
-func (c *controller) reconcileClusterServicePlan(clusterServicePlan *v1beta1.ClusterServicePlan) error {
-	glog.Infof("ClusterServicePlan %q (ExternalName: %q): processing", clusterServicePlan.Name, clusterServicePlan.Spec.ExternalName)
+func (c *controller) reconcileServicePlan(servicePlan *v1beta1.ServicePlan) error {
+	pcb := pretty.NewContextBuilder(pretty.ServicePlan, servicePlan.ObjectMeta.Namespace, servicePlan.ObjectMeta.Name)
+	glog.Info(pcb.Message("processing"))
 
-	if !clusterServicePlan.Status.RemovedFromBrokerCatalog {
+	if !servicePlan.Status.RemovedFromBrokerCatalog {
 		return nil
 	}
 
-	glog.Infof("ClusterServicePlan %q (ExternalName: %q): has been removed from broker catalog; determining whether there are instances remaining", clusterServicePlan.Name, clusterServicePlan.Spec.ExternalName)
+	glog.Infof(pcb.Message("ServicePlan has been removed from the broker catalog; determining whether there are instances remaining"))
 
-	serviceInstances, err := c.findServiceInstancesOnClusterServicePlan(clusterServicePlan)
+	serviceInstances, err := c.findServiceInstancesOnServicePlan(servicePlan)
 	if err != nil {
 		return err
 	}
@@ -87,13 +96,15 @@ func (c *controller) reconcileClusterServicePlan(clusterServicePlan *v1beta1.Clu
 		return nil
 	}
 
-	glog.Infof("ClusterServicePlan %q (ExternalName: %q): has been removed from broker catalog and has zero instances remaining; deleting", clusterServicePlan.Name, clusterServicePlan.Spec.ExternalName)
-	return c.serviceCatalogClient.ClusterServicePlans().Delete(clusterServicePlan.Name, &metav1.DeleteOptions{})
+	glog.Info(pcb.Message("ServicePlan has been removed from the broker catalog and has zero instances remaining; deleting"))
+	ns := servicePlan.ObjectMeta.Namespace
+	return c.serviceCatalogClient.ServicePlans(ns).Delete(servicePlan.Name, &metav1.DeleteOptions{})
 }
 
-func (c *controller) findServiceInstancesOnClusterServicePlan(clusterServicePlan *v1beta1.ClusterServicePlan) (*v1beta1.ServiceInstanceList, error) {
+func (c *controller) findServiceInstancesOnServicePlan(servicePlan *v1beta1.ServicePlan) (*v1beta1.ServiceInstanceList, error) {
+	// ERIK TODO: Need to enhance service instances to support ns service plans?
 	fieldSet := fields.Set{
-		"spec.clusterServicePlanRef.name": clusterServicePlan.Name,
+		"spec.servicePlanRef.name": servicePlan.Name,
 	}
 	fieldSelector := fields.SelectorFromSet(fieldSet).String()
 	listOpts := metav1.ListOptions{FieldSelector: fieldSelector}

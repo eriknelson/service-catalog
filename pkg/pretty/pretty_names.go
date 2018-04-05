@@ -62,6 +62,18 @@ func ClusterServicePlanName(servicePlan *v1beta1.ClusterServicePlan) string {
 	return Name(ClusterServicePlan, "", "")
 }
 
+// ServicePlanName returns a string with the type, namespace and name of an servicePlan.
+func ServicePlanName(servicePlan *v1beta1.ServicePlan) string {
+	var name string
+	if servicePlan != nil {
+		name = Name(ClusterServicePlan, servicePlan.Name, servicePlan.Spec.ExternalName)
+	} else {
+		name = Name(ClusterServicePlan, "", "")
+	}
+
+	return fmt.Sprintf(`%s "%s/%s"`, ServicePlan, servicePlan.Namespace, name)
+}
+
 // FromServiceInstanceOfClusterServiceClassAtBrokerName returns a string in the form of "%s of %s at %s" to help in logging the full context.
 func FromServiceInstanceOfClusterServiceClassAtBrokerName(instance *v1beta1.ServiceInstance, serviceClass *v1beta1.ClusterServiceClass, brokerName string) string {
 	return fmt.Sprintf(
