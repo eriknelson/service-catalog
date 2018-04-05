@@ -39,7 +39,7 @@ const (
 	errorFetchingCatalogReason  string = "ErrorFetchingCatalog"
 	errorFetchingCatalogMessage string = "Error fetching catalog. "
 	errorSyncingCatalogReason   string = "ErrorSyncingCatalog"
-	errorSyncingCatalogMessage  string = "Error syncing catalog from ServiceBroker. "
+	errorSyncingCatalogMessage  string = "Error syncing catalog from ServiceBroker."
 
 	errorListingClusterServiceClassesReason  string = "ErrorListingServiceClasses"
 	errorListingClusterServiceClassesMessage string = "Error listing service classes."
@@ -60,7 +60,7 @@ const (
 	errorReconciliationRetryTimeoutReason string = "ErrorReconciliationRetryTimeout"
 )
 
-func (c *controller) brokerAdd(obj interface{}) {
+func (c *controller) clusterServiceBrokerAdd(obj interface{}) {
 	// DeletionHandlingMetaNamespaceKeyFunc returns a unique key for the resource and
 	// handles the special case where the resource is of DeletedFinalStateUnknown type, which
 	// acts a place holder for resources that have been deleted from storage but the watch event
@@ -72,14 +72,14 @@ func (c *controller) brokerAdd(obj interface{}) {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
 		return
 	}
-	c.brokerQueue.Add(key)
+	c.clusterServiceBrokerQueue.Add(key)
 }
 
-func (c *controller) brokerUpdate(oldObj, newObj interface{}) {
-	c.brokerAdd(newObj)
+func (c *controller) clusterServiceBrokerUpdate(oldObj, newObj interface{}) {
+	c.clusterServiceBrokerAdd(newObj)
 }
 
-func (c *controller) brokerDelete(obj interface{}) {
+func (c *controller) clusterServiceBrokerDelete(obj interface{}) {
 	broker, ok := obj.(*v1beta1.ClusterServiceBroker)
 	if broker == nil || !ok {
 		return
@@ -150,7 +150,7 @@ func shouldReconcileClusterServiceBroker(broker *v1beta1.ClusterServiceBroker, n
 }
 
 func (c *controller) reconcileClusterServiceBrokerKey(key string) error {
-	broker, err := c.brokerLister.Get(key)
+	broker, err := c.clusterServiceBrokerLister.Get(key)
 	pcb := pretty.NewContextBuilder(pretty.ClusterServiceBroker, "", key)
 	if errors.IsNotFound(err) {
 		glog.Info(pcb.Message("Not doing work because it has been deleted"))

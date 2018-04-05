@@ -93,7 +93,7 @@ func NewController(
 		OSBAPIPreferredVersion:      osbAPIPreferredVersion,
 		recorder:                    recorder,
 		reconciliationRetryDuration: reconciliationRetryDuration,
-		brokerQueue:                 workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-broker"),
+		clusterServiceBrokerQueue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cluster-service-broker"),
 		serviceClassQueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-class"),
 		servicePlanQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-plan"),
 		instanceQueue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-instance"),
@@ -104,11 +104,11 @@ func NewController(
 		clusterIDConfigMapNamespace: clusterIDConfigMapNamespace,
 	}
 
-	controller.brokerLister = brokerInformer.Lister()
+	controller.clusterServiceBrokerLister = brokerInformer.Lister()
 	brokerInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    controller.brokerAdd,
-		UpdateFunc: controller.brokerUpdate,
-		DeleteFunc: controller.brokerDelete,
+		AddFunc:    controller.clusterServiceBrokerAdd,
+		UpdateFunc: controller.clusterServiceBrokerUpdate,
+		DeleteFunc: controller.clusterServiceBrokerDelete,
 	})
 
 	controller.serviceClassLister = clusterServiceClassInformer.Lister()
@@ -156,7 +156,7 @@ type controller struct {
 	kubeClient                  kubernetes.Interface
 	serviceCatalogClient        servicecatalogclientset.ServicecatalogV1beta1Interface
 	brokerClientCreateFunc      osb.CreateFunc
-	brokerLister                listers.ClusterServiceBrokerLister
+	clusterServiceBrokerLister  listers.ClusterServiceBrokerLister
 	serviceClassLister          listers.ClusterServiceClassLister
 	instanceLister              listers.ServiceInstanceLister
 	bindingLister               listers.ServiceBindingLister
@@ -165,7 +165,7 @@ type controller struct {
 	OSBAPIPreferredVersion      string
 	recorder                    record.EventRecorder
 	reconciliationRetryDuration time.Duration
-	brokerQueue                 workqueue.RateLimitingInterface
+	clusterServiceBrokerQueue   workqueue.RateLimitingInterface
 	serviceClassQueue           workqueue.RateLimitingInterface
 	servicePlanQueue            workqueue.RateLimitingInterface
 	instanceQueue               workqueue.RateLimitingInterface
@@ -198,7 +198,7 @@ func (c *controller) Run(workers int, stopCh <-chan struct{}) {
 	var waitGroup sync.WaitGroup
 
 	for i := 0; i < workers; i++ {
-		createWorker(c.brokerQueue, "ClusterServiceBroker", maxRetries, true, c.reconcileClusterServiceBrokerKey, stopCh, &waitGroup)
+		createWorker(c.clusterServiceBrokerQueue, "ClusterServiceBroker", maxRetries, true, c.reconcileClusterServiceBrokerKey, stopCh, &waitGroup)
 		createWorker(c.serviceClassQueue, "ClusterServiceClass", maxRetries, true, c.reconcileClusterServiceClassKey, stopCh, &waitGroup)
 		createWorker(c.servicePlanQueue, "ClusterServicePlan", maxRetries, true, c.reconcileClusterServicePlanKey, stopCh, &waitGroup)
 		createWorker(c.instanceQueue, "ServiceInstance", maxRetries, true, c.reconcileServiceInstanceKey, stopCh, &waitGroup)
@@ -219,7 +219,7 @@ func (c *controller) Run(workers int, stopCh <-chan struct{}) {
 	<-stopCh
 	glog.Info("Shutting down service-catalog controller")
 
-	c.brokerQueue.ShutDown()
+	c.clusterServiceBrokerQueue.ShutDown()
 	c.serviceClassQueue.ShutDown()
 	c.servicePlanQueue.ShutDown()
 	c.instanceQueue.ShutDown()
@@ -361,8 +361,8 @@ func (c *controller) getClusterServiceClassPlanAndClusterServiceBroker(instance 
 			return nil, nil, "", nil, &operationError{
 				reason: errorNonexistentClusterServicePlanReason,
 				message: fmt.Sprintf(
-					"The instance references a non-existent ClusterServicePlan (K8S: %q ExternalName: %q) on ClusterServiceClass %v",
-					instance.Spec.ClusterServicePlanName, instance.Spec.ClusterServicePlanExternalName, pretty.ClusterServiceClassName(serviceClass),
+					"The instance references a non-existent ClusterServicePlan %q - %v",
+					instance.Spec.ClusterServicePlanRef.Name, instance.Spec.PlanReference,
 				),
 			}
 		}
@@ -386,7 +386,7 @@ func (c *controller) getClusterServiceClassAndClusterServiceBroker(instance *v1b
 		}
 	}
 
-	broker, err := c.brokerLister.Get(serviceClass.Spec.ClusterServiceBrokerName)
+	broker, err := c.clusterServiceBrokerLister.Get(serviceClass.Spec.ClusterServiceBrokerName)
 	if err != nil {
 		return nil, "", nil, &operationError{
 			reason: errorNonexistentClusterServiceBrokerReason,
@@ -428,8 +428,8 @@ func (c *controller) getClusterServiceClassPlanAndClusterServiceBrokerForService
 	serviceClass, err := c.serviceClassLister.Get(instance.Spec.ClusterServiceClassRef.Name)
 	if err != nil {
 		s := fmt.Sprintf(
-			"References a non-existent ClusterServiceClass (K8S: %q ExternalName: %q)",
-			instance.Spec.ClusterServiceClassRef.Name, instance.Spec.ClusterServiceClassExternalName,
+			"References a non-existent ClusterServiceClass %q - %c",
+			instance.Spec.ClusterServiceClassRef.Name, instance.Spec.PlanReference,
 		)
 		glog.Warning(pcb.Message(s))
 		c.updateServiceBindingCondition(
@@ -446,8 +446,8 @@ func (c *controller) getClusterServiceClassPlanAndClusterServiceBrokerForService
 	servicePlan, err := c.servicePlanLister.Get(instance.Spec.ClusterServicePlanRef.Name)
 	if nil != err {
 		s := fmt.Sprintf(
-			"References a non-existent ClusterServicePlan (K8S: %q ExternalName: %q) on ClusterServiceClass (K8S: %q ExternalName: %q)",
-			instance.Spec.ClusterServicePlanName, instance.Spec.ClusterServicePlanExternalName, serviceClass.Name, serviceClass.Spec.ExternalName,
+			"References a non-existent ClusterServicePlan %q - %v",
+			instance.Spec.ClusterServicePlanRef.Name, instance.Spec.PlanReference,
 		)
 		glog.Warning(pcb.Message(s))
 		c.updateServiceBindingCondition(
@@ -461,7 +461,7 @@ func (c *controller) getClusterServiceClassPlanAndClusterServiceBrokerForService
 		return nil, nil, "", nil, fmt.Errorf(s)
 	}
 
-	broker, err := c.brokerLister.Get(serviceClass.Spec.ClusterServiceBrokerName)
+	broker, err := c.clusterServiceBrokerLister.Get(serviceClass.Spec.ClusterServiceBrokerName)
 	if err != nil {
 		s := fmt.Sprintf("References a non-existent ClusterServiceBroker %q", serviceClass.Spec.ClusterServiceBrokerName)
 		glog.Warning(pcb.Message(s))
