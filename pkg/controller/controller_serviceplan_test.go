@@ -30,11 +30,11 @@ import (
 )
 
 func TestReconcileServicePlanRemovedFromCatalog(t *testing.T) {
-	//getRemovedPlan := func() *v1beta1.ServicePlan {
-	//p := getTestServicePlan()
-	//p.Status.RemovedFromBrokerCatalog = true
-	//return p
-	//}
+	getRemovedPlan := func() *v1beta1.ServicePlan {
+		p := getTestServicePlan()
+		p.Status.RemovedFromBrokerCatalog = true
+		return p
+	}
 
 	cases := []struct {
 		name                    string
@@ -50,21 +50,21 @@ func TestReconcileServicePlanRemovedFromCatalog(t *testing.T) {
 			plan:        getTestServicePlan(),
 			shouldError: false,
 		},
-		//{
-		//name:        "removed from catalog, instances left",
-		//plan:        getRemovedPlan(),
-		//instances:   []v1beta1.ServiceInstance{*getTestServiceInstance()},
-		//shouldError: false,
-		//catalogActionsCheckFunc: func(t *testing.T, name string, actions []clientgotesting.Action) {
-		//listRestrictions := clientgotesting.ListRestrictions{
-		//Labels: labels.Everything(),
-		//Fields: fields.OneTermEqualSelector("spec.clusterServicePlanRef.name", "SPGUID"),
-		//}
+		{
+			name:        "removed from catalog, instances left",
+			plan:        getRemovedPlan(),
+			instances:   []v1beta1.ServiceInstance{*getTestServiceInstance()},
+			shouldError: false,
+			catalogActionsCheckFunc: func(t *testing.T, name string, actions []clientgotesting.Action) {
+				listRestrictions := clientgotesting.ListRestrictions{
+					Labels: labels.Everything(),
+					Fields: fields.OneTermEqualSelector("spec.clusterServicePlanRef.name", "SPGUID"),
+				}
 
-		//expectNumberOfActions(t, name, actions, 1)
-		//assertList(t, actions[0], &v1beta1.ServiceInstance{}, listRestrictions)
-		//},
-		//},
+				expectNumberOfActions(t, name, actions, 1)
+				assertList(t, actions[0], &v1beta1.ServiceInstance{}, listRestrictions)
+			},
+		},
 		//{
 		//name:        "removed from catalog, no instances left",
 		//plan:        getRemovedPlan(),
