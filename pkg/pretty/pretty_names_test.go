@@ -96,7 +96,7 @@ func TestServicePlanName(t *testing.T) {
 		},
 	}
 
-	e := `ServicePlan "test-ns/(K8S: "service-plan" ExternalName: "external-plan-name")"`
+	e := `ServicePlan "test-ns/ServicePlan (K8S: "service-plan" ExternalName: "external-plan-name")"`
 	g := ServicePlanName(servicePlan)
 	if g != e {
 		t.Fatalf("Unexpected value of PrettyName String; expected %v, got %v", e, g)

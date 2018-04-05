@@ -66,9 +66,9 @@ func ClusterServicePlanName(servicePlan *v1beta1.ClusterServicePlan) string {
 func ServicePlanName(servicePlan *v1beta1.ServicePlan) string {
 	var name string
 	if servicePlan != nil {
-		name = Name(ClusterServicePlan, servicePlan.Name, servicePlan.Spec.ExternalName)
+		name = Name(ServicePlan, servicePlan.Name, servicePlan.Spec.ExternalName)
 	} else {
-		name = Name(ClusterServicePlan, "", "")
+		name = Name(ServicePlan, "", "")
 	}
 
 	return fmt.Sprintf(`%s "%s/%s"`, ServicePlan, servicePlan.Namespace, name)

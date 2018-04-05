@@ -62,7 +62,9 @@ import (
 
 const (
 	testClusterServiceClassGUID            = "CSCGUID"
+	testServiceClassGUID                   = "SCGUID"
 	testClusterServicePlanGUID             = "CSPGUID"
+	testServicePlanGUID                    = "SPGUID"
 	testNonbindableClusterServiceClassGUID = "UNBINDABLE-CLUSTERSERVICECLASS"
 	testNonbindableClusterServicePlanGUID  = "UNBINDABLE-CLUSTERSERVICEPLAN"
 	testServiceInstanceGUID                = "IGUID"
@@ -74,6 +76,8 @@ const (
 	testClusterServiceBrokerName            = "test-clusterservicebroker"
 	testClusterServiceClassName             = "test-clusterserviceclass"
 	testClusterServicePlanName              = "test-clusterserviceplan"
+	testServiceBrokerName                   = "test-servicebroker"
+	testServicePlanName                     = "test-serviceplan"
 	testNonExistentClusterServiceClassName  = "nothere"
 	testNonbindableClusterServiceClassName  = "test-unbindable-clusterserviceclass"
 	testNonbindableClusterServicePlanName   = "test-unbindable-clusterserviceplan"
@@ -558,6 +562,82 @@ func getTestClusterServicePlanNonbindable() *v1beta1.ClusterServicePlan {
 		},
 	}
 }
+
+func getTestServicePlan() *v1beta1.ServicePlan {
+	return &v1beta1.ServicePlan{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testServicePlanGUID,
+			Namespace: testNamespace,
+		},
+		Spec: v1beta1.ServicePlanSpec{
+			ServiceBrokerName: testServiceBrokerName,
+			CommonServicePlanSpec: v1beta1.CommonServicePlanSpec{
+				ExternalID:   testServicePlanGUID,
+				ExternalName: testServicePlanName,
+				Bindable:     truePtr(),
+			},
+			ServiceClassRef: v1beta1.LocalObjectReference{
+				Name: testServiceClassGUID,
+			},
+		},
+		Status: v1beta1.ServicePlanStatus{},
+	}
+}
+
+//func getTestMarkedAsRemovedClusterServicePlan() *v1beta1.ClusterServicePlan {
+//return &v1beta1.ClusterServicePlan{
+//ObjectMeta: metav1.ObjectMeta{Name: testRemovedClusterServicePlanGUID},
+//Spec: v1beta1.ClusterServicePlanSpec{
+//ClusterServiceBrokerName: testClusterServiceBrokerName,
+//CommonServicePlanSpec: v1beta1.CommonServicePlanSpec{
+//ExternalID:   testRemovedClusterServicePlanGUID,
+//ExternalName: testRemovedClusterServicePlanName,
+//Bindable:     truePtr(),
+//},
+//ClusterServiceClassRef: v1beta1.ClusterObjectReference{
+//Name: testClusterServiceClassGUID,
+//},
+//},
+//Status: v1beta1.ClusterServicePlanStatus{
+//CommonServicePlanStatus: v1beta1.CommonServicePlanStatus{
+//RemovedFromBrokerCatalog: true,
+//},
+//},
+//}
+//}
+
+//func getTestRemovedClusterServicePlan() *v1beta1.ClusterServicePlan {
+//return &v1beta1.ClusterServicePlan{
+//ObjectMeta: metav1.ObjectMeta{Name: testRemovedClusterServicePlanGUID},
+//Spec: v1beta1.ClusterServicePlanSpec{
+//ClusterServiceBrokerName: testClusterServiceBrokerName,
+//CommonServicePlanSpec: v1beta1.CommonServicePlanSpec{
+//ExternalID:   testRemovedClusterServicePlanGUID,
+//ExternalName: testRemovedClusterServicePlanName,
+//Bindable:     truePtr(),
+//},
+//ClusterServiceClassRef: v1beta1.ClusterObjectReference{
+//Name: testClusterServiceClassGUID,
+//},
+//},
+//}
+//}
+
+//func getTestClusterServicePlanNonbindable() *v1beta1.ClusterServicePlan {
+//return &v1beta1.ClusterServicePlan{
+//ObjectMeta: metav1.ObjectMeta{Name: testNonbindableClusterServicePlanGUID},
+//Spec: v1beta1.ClusterServicePlanSpec{
+//CommonServicePlanSpec: v1beta1.CommonServicePlanSpec{
+//ExternalName: testNonbindableClusterServicePlanName,
+//ExternalID:   testNonbindableClusterServicePlanGUID,
+//Bindable:     falsePtr(),
+//},
+//ClusterServiceClassRef: v1beta1.ClusterObjectReference{
+//Name: testClusterServiceClassGUID,
+//},
+//},
+//}
+//}
 
 // an unbindable service class wired to the result of getTestClusterServiceBroker()
 func getTestNonbindableClusterServiceClass() *v1beta1.ClusterServiceClass {
@@ -1588,6 +1668,7 @@ func newTestController(t *testing.T, config fakeosb.FakeClientConfiguration) (
 		serviceCatalogSharedInformers.ServiceInstances(),
 		serviceCatalogSharedInformers.ServiceBindings(),
 		serviceCatalogSharedInformers.ClusterServicePlans(),
+		serviceCatalogSharedInformers.ServicePlans(),
 		brokerClFunc,
 		24*time.Hour,
 		osb.LatestAPIVersion().HeaderValue(),
