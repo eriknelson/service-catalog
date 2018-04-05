@@ -71,11 +71,12 @@ const (
 func NewController(
 	kubeClient kubernetes.Interface,
 	serviceCatalogClient servicecatalogclientset.ServicecatalogV1beta1Interface,
-	brokerInformer informers.ClusterServiceBrokerInformer,
+	clusterServiceBrokerInformer informers.ClusterServiceBrokerInformer,
 	clusterServiceClassInformer informers.ClusterServiceClassInformer,
 	instanceInformer informers.ServiceInstanceInformer,
 	bindingInformer informers.ServiceBindingInformer,
 	clusterServicePlanInformer informers.ClusterServicePlanInformer,
+	servicePlanInformer informers.ServicePlanInformer,
 	brokerClientCreateFunc osb.CreateFunc,
 	brokerRelistInterval time.Duration,
 	osbAPIPreferredVersion string,
@@ -95,6 +96,7 @@ func NewController(
 		reconciliationRetryDuration: reconciliationRetryDuration,
 		clusterServiceBrokerQueue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cluster-service-broker"),
 		clusterServicePlanQueue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cluster-service-plan"),
+		servicePlanQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-plan"),
 		clusterServiceClassQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cluster-service-class"),
 		instanceQueue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-instance"),
 		bindingQueue:                workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-binding"),
@@ -104,8 +106,8 @@ func NewController(
 		clusterIDConfigMapNamespace: clusterIDConfigMapNamespace,
 	}
 
-	controller.clusterServiceBrokerLister = brokerInformer.Lister()
-	brokerInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	controller.clusterServiceBrokerLister = clusterServiceBrokerInformer.Lister()
+	clusterServiceBrokerInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    controller.clusterServiceBrokerAdd,
 		UpdateFunc: controller.clusterServiceBrokerUpdate,
 		DeleteFunc: controller.clusterServiceBrokerDelete,
@@ -139,6 +141,15 @@ func NewController(
 		DeleteFunc: controller.bindingDelete,
 	})
 
+	if utilfeature.DefaultFeatureGate.Enabled(scfeatures.NamespacedServiceBroker) {
+		controller.servicePlanLister = servicePlanInformer.Lister()
+		servicePlanInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    controller.servicePlanAdd,
+			UpdateFunc: controller.servicePlanUpdate,
+			DeleteFunc: controller.servicePlanDelete,
+		})
+	}
+
 	return controller, nil
 }
 
@@ -161,12 +172,14 @@ type controller struct {
 	instanceLister              listers.ServiceInstanceLister
 	bindingLister               listers.ServiceBindingLister
 	clusterServicePlanLister    listers.ClusterServicePlanLister
+	servicePlanLister           listers.ServicePlanLister
 	brokerRelistInterval        time.Duration
 	OSBAPIPreferredVersion      string
 	recorder                    record.EventRecorder
 	reconciliationRetryDuration time.Duration
 	clusterServiceBrokerQueue   workqueue.RateLimitingInterface
 	clusterServicePlanQueue     workqueue.RateLimitingInterface
+	servicePlanQueue            workqueue.RateLimitingInterface
 	clusterServiceClassQueue    workqueue.RateLimitingInterface
 	instanceQueue               workqueue.RateLimitingInterface
 	bindingQueue                workqueue.RateLimitingInterface
@@ -208,6 +221,10 @@ func (c *controller) Run(workers int, stopCh <-chan struct{}) {
 		if utilfeature.DefaultFeatureGate.Enabled(scfeatures.AsyncBindingOperations) {
 			createWorker(c.bindingPollingQueue, "BindingPoller", maxRetries, false, c.requeueServiceBindingForPoll, stopCh, &waitGroup)
 		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(scfeatures.NamespacedServiceBroker) {
+			createWorker(c.servicePlanQueue, "ServicePlan", maxRetries, true, c.reconcileServicePlanKey, stopCh, &waitGroup)
+		}
 	}
 
 	// this creates a worker specifically for monitoring
@@ -221,6 +238,7 @@ func (c *controller) Run(workers int, stopCh <-chan struct{}) {
 
 	c.clusterServiceBrokerQueue.ShutDown()
 	c.clusterServicePlanQueue.ShutDown()
+	c.servicePlanQueue.ShutDown()
 	c.clusterServiceClassQueue.ShutDown()
 	c.instanceQueue.ShutDown()
 	c.bindingQueue.ShutDown()

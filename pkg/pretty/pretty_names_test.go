@@ -68,7 +68,7 @@ func TestClusterServiceClassName(t *testing.T) {
 
 func TestClusterServicePlanName(t *testing.T) {
 	servicePlan := &v1beta1.ClusterServicePlan{
-		ObjectMeta: metav1.ObjectMeta{Name: "service-plan"},
+		ObjectMeta: metav1.ObjectMeta{Name: "cluster-service-plan"},
 		Spec: v1beta1.ClusterServicePlanSpec{
 			CommonServicePlanSpec: v1beta1.CommonServicePlanSpec{
 				ExternalName: "external-plan-name",
@@ -76,8 +76,28 @@ func TestClusterServicePlanName(t *testing.T) {
 		},
 	}
 
-	e := `ClusterServicePlan (K8S: "service-plan" ExternalName: "external-plan-name")`
+	e := `ClusterServicePlan (K8S: "cluster-service-plan" ExternalName: "external-plan-name")`
 	g := ClusterServicePlanName(servicePlan)
+	if g != e {
+		t.Fatalf("Unexpected value of PrettyName String; expected %v, got %v", e, g)
+	}
+}
+
+func TestServicePlanName(t *testing.T) {
+	servicePlan := &v1beta1.ServicePlan{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "service-plan",
+			Namespace: "test-ns",
+		},
+		Spec: v1beta1.ServicePlanSpec{
+			CommonServicePlanSpec: v1beta1.CommonServicePlanSpec{
+				ExternalName: "external-plan-name",
+			},
+		},
+	}
+
+	e := `ServicePlan "test-ns/(K8S: "service-plan" ExternalName: "external-plan-name")"`
+	g := ServicePlanName(servicePlan)
 	if g != e {
 		t.Fatalf("Unexpected value of PrettyName String; expected %v, got %v", e, g)
 	}
