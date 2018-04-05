@@ -61,24 +61,37 @@ import (
 // loops for the different catalog API resources.
 
 const (
-	testClusterServiceClassGUID            = "SCGUID"
-	testClusterServicePlanGUID             = "PGUID"
-	testNonbindableClusterServiceClassGUID = "UNBINDABLE-SERVICE"
-	testNonbindableClusterServicePlanGUID  = "UNBINDABLE-PLAN"
+	testClusterServiceClassGUID            = "CSCGUID"
+	testServiceClassGUID                   = "SCGUID"
+	testClusterServicePlanGUID             = "CSPGUID"
+	testServicePlanGUID                    = "SPGUID"
+	testNonbindableClusterServiceClassGUID = "UNBINDABLE-CLUSTERSERVICECLASS"
+	testNonbindableServiceClassGUID        = "UNBINDABLE-SERVICECLASS"
+	testNonbindableClusterServicePlanGUID  = "UNBINDABLE-CLUSTERSERVICEPLAN"
+	testNonbindableServicePlanGUID         = "UNBINDABLE-SERVICEPLAN"
 	testServiceInstanceGUID                = "IGUID"
 	testServiceBindingGUID                 = "BGUID"
 	testNamespaceGUID                      = "test-ns-uid"
-	testRemovedClusterServiceClassGUID     = "REMOVED-SERVICE"
-	testRemovedClusterServicePlanGUID      = "REMOVED-PLAN"
+	testRemovedClusterServiceClassGUID     = "REMOVED-CLUSTERSERVICECLASS"
+	testRemovedServiceClassGUID            = "REMOVED-SERVICECLASS"
+	testRemovedClusterServicePlanGUID      = "REMOVED-CLUSTERSERVICEPLAN"
+	testRemovedServicePlanGUID             = "REMOVED-SERVICEPLAN"
 
-	testClusterServiceBrokerName            = "test-broker"
-	testClusterServiceClassName             = "test-serviceclass"
-	testClusterServicePlanName              = "test-plan"
+	testClusterServiceBrokerName            = "test-clusterservicebroker"
+	testServiceBrokerName                   = "test-servicebroker"
+	testClusterServiceClassName             = "test-clusterserviceclass"
+	testServiceClassName                    = "test-serviceclass"
+	testClusterServicePlanName              = "test-clusterserviceplan"
+	testServicePlanName                     = "test-serviceplan"
 	testNonExistentClusterServiceClassName  = "nothere"
-	testNonbindableClusterServiceClassName  = "test-unbindable-serviceclass"
-	testNonbindableClusterServicePlanName   = "test-unbindable-plan"
-	testRemovedClusterServiceClassName      = "removed-test-serviceclass"
-	testRemovedClusterServicePlanName       = "removed-test-plan"
+	testNonbindableClusterServiceClassName  = "test-unbindable-clusterserviceclass"
+	testNonbindableServiceClassName         = "test-unbindable-serviceclass"
+	testNonbindableClusterServicePlanName   = "test-unbindable-clusterserviceplan"
+	testNonbindableServicePlanName          = "test-unbindable-serviceplan"
+	testRemovedClusterServiceClassName      = "removed-test-clusterserviceclass"
+	testRemovedServiceClassName             = "removed-test-serviceclass"
+	testRemovedClusterServicePlanName       = "removed-test-clusterserviceplan"
+	testRemovedServicePlanName              = "removed-test-serviceplan"
 	testServiceInstanceName                 = "test-instance"
 	testServiceBindingName                  = "test-binding"
 	testServiceBindingSecretName            = "test-secret"
@@ -554,6 +567,82 @@ func getTestClusterServicePlanNonbindable() *v1beta1.ClusterServicePlan {
 			},
 			ClusterServiceClassRef: v1beta1.ClusterObjectReference{
 				Name: testClusterServiceClassGUID,
+			},
+		},
+	}
+}
+
+func getTestServicePlan() *v1beta1.ServicePlan {
+	return &v1beta1.ServicePlan{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testServicePlanGUID,
+			Namespace: testNamespace,
+		},
+		Spec: v1beta1.ServicePlanSpec{
+			ServiceBrokerName: testServiceBrokerName,
+			CommonServicePlanSpec: v1beta1.CommonServicePlanSpec{
+				ExternalID:   testServicePlanGUID,
+				ExternalName: testServicePlanName,
+				Bindable:     truePtr(),
+			},
+			ServiceClassRef: v1beta1.LocalObjectReference{
+				Name: testServiceClassGUID,
+			},
+		},
+		Status: v1beta1.ServicePlanStatus{},
+	}
+}
+
+func getTestMarkedAsRemovedServicePlan() *v1beta1.ServicePlan {
+	return &v1beta1.ServicePlan{
+		ObjectMeta: metav1.ObjectMeta{Name: testRemovedServicePlanGUID},
+		Spec: v1beta1.ServicePlanSpec{
+			ServiceBrokerName: testServiceBrokerName,
+			CommonServicePlanSpec: v1beta1.CommonServicePlanSpec{
+				ExternalID:   testRemovedServicePlanGUID,
+				ExternalName: testRemovedServicePlanName,
+				Bindable:     truePtr(),
+			},
+			ServiceClassRef: v1beta1.LocalObjectReference{
+				Name: testServiceClassGUID,
+			},
+		},
+		Status: v1beta1.ServicePlanStatus{
+			CommonServicePlanStatus: v1beta1.CommonServicePlanStatus{
+				RemovedFromBrokerCatalog: true,
+			},
+		},
+	}
+}
+
+func getTestRemovedServicePlan() *v1beta1.ServicePlan {
+	return &v1beta1.ServicePlan{
+		ObjectMeta: metav1.ObjectMeta{Name: testRemovedServicePlanGUID},
+		Spec: v1beta1.ServicePlanSpec{
+			ServiceBrokerName: testServiceBrokerName,
+			CommonServicePlanSpec: v1beta1.CommonServicePlanSpec{
+				ExternalID:   testRemovedServicePlanGUID,
+				ExternalName: testRemovedServicePlanName,
+				Bindable:     truePtr(),
+			},
+			ServiceClassRef: v1beta1.LocalObjectReference{
+				Name: testServiceClassGUID,
+			},
+		},
+	}
+}
+
+func getTestServicePlanNonbindable() *v1beta1.ServicePlan {
+	return &v1beta1.ServicePlan{
+		ObjectMeta: metav1.ObjectMeta{Name: testNonbindableServicePlanGUID},
+		Spec: v1beta1.ServicePlanSpec{
+			CommonServicePlanSpec: v1beta1.CommonServicePlanSpec{
+				ExternalName: testNonbindableServicePlanName,
+				ExternalID:   testNonbindableServicePlanGUID,
+				Bindable:     falsePtr(),
+			},
+			ServiceClassRef: v1beta1.LocalObjectReference{
+				Name: testServiceClassGUID,
 			},
 		},
 	}
@@ -1588,6 +1677,7 @@ func newTestController(t *testing.T, config fakeosb.FakeClientConfiguration) (
 		serviceCatalogSharedInformers.ServiceInstances(),
 		serviceCatalogSharedInformers.ServiceBindings(),
 		serviceCatalogSharedInformers.ClusterServicePlans(),
+		serviceCatalogSharedInformers.ServicePlans(),
 		brokerClFunc,
 		24*time.Hour,
 		osb.LatestAPIVersion().HeaderValue(),

@@ -29,16 +29,16 @@ import (
 	clientgotesting "k8s.io/client-go/testing"
 )
 
-func TestReconcileClusterServicePlanRemovedFromCatalog(t *testing.T) {
-	getRemovedPlan := func() *v1beta1.ClusterServicePlan {
-		p := getTestClusterServicePlan()
+func TestReconcileServicePlanRemovedFromCatalog(t *testing.T) {
+	getRemovedPlan := func() *v1beta1.ServicePlan {
+		p := getTestServicePlan()
 		p.Status.RemovedFromBrokerCatalog = true
 		return p
 	}
 
 	cases := []struct {
 		name                    string
-		plan                    *v1beta1.ClusterServicePlan
+		plan                    *v1beta1.ServicePlan
 		instances               []v1beta1.ServiceInstance
 		catalogClientPrepFunc   func(*fake.Clientset)
 		shouldError             bool
@@ -47,7 +47,7 @@ func TestReconcileClusterServicePlanRemovedFromCatalog(t *testing.T) {
 	}{
 		{
 			name:        "not removed from catalog",
-			plan:        getTestClusterServicePlan(),
+			plan:        getTestServicePlan(),
 			shouldError: false,
 		},
 		{
@@ -116,7 +116,7 @@ func TestReconcileClusterServicePlanRemovedFromCatalog(t *testing.T) {
 			tc.catalogClientPrepFunc(fakeCatalogClient)
 		}
 
-		err := testController.reconcileClusterServicePlan(tc.plan)
+		err := testController.reconcileServicePlan(tc.plan)
 		if err != nil {
 			if !tc.shouldError {
 				t.Errorf("%v: unexpected error from method under test: %v", tc.name, err)
