@@ -23,6 +23,7 @@ type Kind int
 const (
 	Unknown Kind = iota
 	ClusterServiceBroker
+	ServiceBroker
 	ClusterServiceClass
 	ClusterServicePlan
 	ServiceBinding
@@ -33,6 +34,8 @@ func (k Kind) String() string {
 	switch k {
 	case ClusterServiceBroker:
 		return "ClusterServiceBroker"
+	case ServiceBroker:
+		return "ServiceBroker"
 	case ClusterServiceClass:
 		return "ClusterServiceClass"
 	case ClusterServicePlan:

@@ -73,6 +73,7 @@ func NewController(
 	kubeClient kubernetes.Interface,
 	serviceCatalogClient servicecatalogclientset.ServicecatalogV1beta1Interface,
 	clusterServiceBrokerInformer informers.ClusterServiceBrokerInformer,
+	serviceBrokerInformer informers.ServiceBrokerInformer,
 	clusterServiceClassInformer informers.ClusterServiceClassInformer,
 	instanceInformer informers.ServiceInstanceInformer,
 	bindingInformer informers.ServiceBindingInformer,
@@ -95,6 +96,7 @@ func NewController(
 		recorder:                    recorder,
 		reconciliationRetryDuration: reconciliationRetryDuration,
 		clusterServiceBrokerQueue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cluster-service-broker"),
+		serviceBrokerQueue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-broker"),
 		clusterServiceClassQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cluster-service-class"),
 		clusterServicePlanQueue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cluster-service-plan"),
 		instanceQueue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-instance"),
@@ -140,6 +142,15 @@ func NewController(
 		DeleteFunc: controller.bindingDelete,
 	})
 
+	if utilfeature.DefaultFeatureGate.Enabled(scfeatures.NamespacedServiceBroker) {
+		controller.serviceBrokerLister = serviceBrokerInformer.Lister()
+		serviceBrokerInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc:    controller.serviceBrokerAdd,
+			UpdateFunc: controller.serviceBrokerUpdate,
+			DeleteFunc: controller.serviceBrokerDelete,
+		})
+	}
+
 	return controller, nil
 }
 
@@ -158,6 +169,7 @@ type controller struct {
 	serviceCatalogClient        servicecatalogclientset.ServicecatalogV1beta1Interface
 	brokerClientCreateFunc      osb.CreateFunc
 	clusterServiceBrokerLister  listers.ClusterServiceBrokerLister
+	serviceBrokerLister         listers.ServiceBrokerLister
 	clusterServiceClassLister   listers.ClusterServiceClassLister
 	instanceLister              listers.ServiceInstanceLister
 	bindingLister               listers.ServiceBindingLister
@@ -167,6 +179,7 @@ type controller struct {
 	recorder                    record.EventRecorder
 	reconciliationRetryDuration time.Duration
 	clusterServiceBrokerQueue   workqueue.RateLimitingInterface
+	serviceBrokerQueue          workqueue.RateLimitingInterface
 	clusterServiceClassQueue    workqueue.RateLimitingInterface
 	clusterServicePlanQueue     workqueue.RateLimitingInterface
 	instanceQueue               workqueue.RateLimitingInterface
@@ -206,6 +219,10 @@ func (c *controller) Run(workers int, stopCh <-chan struct{}) {
 		createWorker(c.bindingQueue, "ServiceBinding", maxRetries, true, c.reconcileServiceBindingKey, stopCh, &waitGroup)
 		createWorker(c.instancePollingQueue, "InstancePoller", maxRetries, false, c.requeueServiceInstanceForPoll, stopCh, &waitGroup)
 
+		if utilfeature.DefaultFeatureGate.Enabled(scfeatures.NamespacedServiceBroker) {
+			createWorker(c.serviceBrokerQueue, "ServiceBroker", maxRetries, true, c.reconcileServiceBrokerKey, stopCh, &waitGroup)
+		}
+
 		if utilfeature.DefaultFeatureGate.Enabled(scfeatures.AsyncBindingOperations) {
 			createWorker(c.bindingPollingQueue, "BindingPoller", maxRetries, false, c.requeueServiceBindingForPoll, stopCh, &waitGroup)
 		}
@@ -221,6 +238,7 @@ func (c *controller) Run(workers int, stopCh <-chan struct{}) {
 	glog.Info("Shutting down service-catalog controller")
 
 	c.clusterServiceBrokerQueue.ShutDown()
+	c.serviceBrokerQueue.ShutDown()
 	c.clusterServiceClassQueue.ShutDown()
 	c.clusterServicePlanQueue.ShutDown()
 	c.instanceQueue.ShutDown()

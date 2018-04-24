@@ -42,8 +42,13 @@ func ServiceInstanceName(instance *v1beta1.ServiceInstance) string {
 }
 
 // ClusterServiceBrokerName returns a string with the type and name of a broker
-func ClusterServiceBrokerName(brokerName string) string {
-	return fmt.Sprintf(`%s %q`, ClusterServiceBroker, brokerName)
+func ClusterServiceBrokerName(clusterServiceBrokerName string) string {
+	return fmt.Sprintf(`%s %q`, ClusterServiceBroker, clusterServiceBrokerName)
+}
+
+// ServiceBrokerName returns a string with the type and name of a broker
+func ServiceBrokerName(serviceBrokerName string) string {
+	return fmt.Sprintf(`%s %q`, ServiceBroker, serviceBrokerName)
 }
 
 // ClusterServiceClassName returns a string with the k8s name and external name if available.
