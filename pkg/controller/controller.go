@@ -72,7 +72,7 @@ const (
 func NewController(
 	kubeClient kubernetes.Interface,
 	serviceCatalogClient servicecatalogclientset.ServicecatalogV1beta1Interface,
-	brokerInformer informers.ClusterServiceBrokerInformer,
+	clusterServiceBrokerInformer informers.ClusterServiceBrokerInformer,
 	clusterServiceClassInformer informers.ClusterServiceClassInformer,
 	instanceInformer informers.ServiceInstanceInformer,
 	bindingInformer informers.ServiceBindingInformer,
@@ -105,8 +105,8 @@ func NewController(
 		clusterIDConfigMapNamespace: clusterIDConfigMapNamespace,
 	}
 
-	controller.clusterServiceBrokerLister = brokerInformer.Lister()
-	brokerInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	controller.clusterServiceBrokerLister = clusterServiceBrokerInformer.Lister()
+	clusterServiceBrokerInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    controller.clusterServiceBrokerAdd,
 		UpdateFunc: controller.clusterServiceBrokerUpdate,
 		DeleteFunc: controller.clusterServiceBrokerDelete,
