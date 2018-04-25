@@ -465,91 +465,91 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 	return nil
 }
 
-//// reconcileClusterServiceClassFromClusterServiceBrokerCatalog reconciles a
-//// ClusterServiceClass after the ClusterServiceBroker's catalog has been re-
-//// listed. The serviceClass parameter is the serviceClass from the broker's
-//// catalog payload. The existingServiceClass parameter is the serviceClass
-//// that already exists for the given broker with this serviceClass' k8s name.
-//func (c *controller) reconcileClusterServiceClassFromClusterServiceBrokerCatalog(broker *v1beta1.ClusterServiceBroker, serviceClass, existingServiceClass *v1beta1.ClusterServiceClass) error {
-//pcb := pretty.NewContextBuilder(pretty.ClusterServiceBroker, "", broker.Name)
-//serviceClass.Spec.ClusterServiceBrokerName = broker.Name
+// reconcileServiceClassFromServiceBrokerCatalog reconciles a
+// ServiceClass after the ServiceBroker's catalog has been re-
+// listed. The serviceClass parameter is the serviceClass from the broker's
+// catalog payload. The existingServiceClass parameter is the serviceClass
+// that already exists for the given broker with this serviceClass' k8s name.
+func (c *controller) reconcileServiceClassFromServiceBrokerCatalog(broker *v1beta1.ServiceBroker, serviceClass, existingServiceClass *v1beta1.ServiceClass) error {
+	pcb := pretty.NewContextBuilder(pretty.ServiceBroker, "", broker.Name)
+	serviceClass.Spec.ServiceBrokerName = broker.Name
 
-//if existingServiceClass == nil {
-//otherServiceClass, err := c.clusterServiceClassLister.Get(serviceClass.Name)
-//if err != nil {
-//// we expect _not_ to find a service class this way, so a not-
-//// found error is expected and legitimate.
-//if !errors.IsNotFound(err) {
-//return err
-//}
-//} else {
-//// we do not expect to find an existing service class if we were
-//// not already passed one; the following if statement will almost
-//// certainly evaluate to true.
-//if otherServiceClass.Spec.ClusterServiceBrokerName != broker.Name {
-//errMsg := fmt.Sprintf("%s already exists for Broker %q",
-//pretty.ClusterServiceClassName(serviceClass), otherServiceClass.Spec.ClusterServiceBrokerName,
-//)
-//glog.Error(pcb.Message(errMsg))
-//return fmt.Errorf(errMsg)
-//}
-//}
+	if existingServiceClass == nil {
+		otherServiceClass, err := c.clusterServiceClassLister.Get(serviceClass.Name)
+		if err != nil {
+			// we expect _not_ to find a service class this way, so a not-
+			// found error is expected and legitimate.
+			if !errors.IsNotFound(err) {
+				return err
+			}
+		} else {
+			// we do not expect to find an existing service class if we were
+			// not already passed one; the following if statement will almost
+			// certainly evaluate to true.
+			if otherServiceClass.Spec.ServiceBrokerName != broker.Name {
+				errMsg := fmt.Sprintf("%s already exists for Broker %q",
+					pretty.ServiceClassName(serviceClass), otherServiceClass.Spec.ServiceBrokerName,
+				)
+				glog.Error(pcb.Message(errMsg))
+				return fmt.Errorf(errMsg)
+			}
+		}
 
-//glog.V(5).Info(pcb.Messagef("Fresh %s; creating", pretty.ClusterServiceClassName(serviceClass)))
-//if _, err := c.serviceCatalogClient.ClusterServiceClasses().Create(serviceClass); err != nil {
-//glog.Error(pcb.Messagef("Error creating %s: %v", pretty.ClusterServiceClassName(serviceClass), err))
-//return err
-//}
+		glog.V(5).Info(pcb.Messagef("Fresh %s; creating", pretty.ServiceClassName(serviceClass)))
+		if _, err := c.serviceCatalogClient.ServiceClasses().Create(serviceClass); err != nil {
+			glog.Error(pcb.Messagef("Error creating %s: %v", pretty.ServiceClassName(serviceClass), err))
+			return err
+		}
 
-//return nil
-//}
+		return nil
+	}
 
-//if existingServiceClass.Spec.ExternalID != serviceClass.Spec.ExternalID {
-//errMsg := fmt.Sprintf(
-//"%s already exists with OSB guid %q, received different guid %q",
-//pretty.ClusterServiceClassName(serviceClass), existingServiceClass.Name, serviceClass.Name,
-//)
-//glog.Error(pcb.Message(errMsg))
-//return fmt.Errorf(errMsg)
-//}
+	if existingServiceClass.Spec.ExternalID != serviceClass.Spec.ExternalID {
+		errMsg := fmt.Sprintf(
+			"%s already exists with OSB guid %q, received different guid %q",
+			pretty.ServiceClassName(serviceClass), existingServiceClass.Name, serviceClass.Name,
+		)
+		glog.Error(pcb.Message(errMsg))
+		return fmt.Errorf(errMsg)
+	}
 
-//glog.V(5).Info(pcb.Messagef("Found existing %s; updating", pretty.ClusterServiceClassName(serviceClass)))
+	glog.V(5).Info(pcb.Messagef("Found existing %s; updating", pretty.ServiceClassName(serviceClass)))
 
-//// There was an existing service class -- project the update onto it and
-//// update it.
-//toUpdate := existingServiceClass.DeepCopy()
-//toUpdate.Spec.BindingRetrievable = serviceClass.Spec.BindingRetrievable
-//toUpdate.Spec.Bindable = serviceClass.Spec.Bindable
-//toUpdate.Spec.PlanUpdatable = serviceClass.Spec.PlanUpdatable
-//toUpdate.Spec.Tags = serviceClass.Spec.Tags
-//toUpdate.Spec.Description = serviceClass.Spec.Description
-//toUpdate.Spec.Requires = serviceClass.Spec.Requires
-//toUpdate.Spec.ExternalName = serviceClass.Spec.ExternalName
-//toUpdate.Spec.ExternalMetadata = serviceClass.Spec.ExternalMetadata
+	// There was an existing service class -- project the update onto it and
+	// update it.
+	toUpdate := existingServiceClass.DeepCopy()
+	toUpdate.Spec.BindingRetrievable = serviceClass.Spec.BindingRetrievable
+	toUpdate.Spec.Bindable = serviceClass.Spec.Bindable
+	toUpdate.Spec.PlanUpdatable = serviceClass.Spec.PlanUpdatable
+	toUpdate.Spec.Tags = serviceClass.Spec.Tags
+	toUpdate.Spec.Description = serviceClass.Spec.Description
+	toUpdate.Spec.Requires = serviceClass.Spec.Requires
+	toUpdate.Spec.ExternalName = serviceClass.Spec.ExternalName
+	toUpdate.Spec.ExternalMetadata = serviceClass.Spec.ExternalMetadata
 
-//updatedServiceClass, err := c.serviceCatalogClient.ClusterServiceClasses().Update(toUpdate)
-//if err != nil {
-//glog.Error(pcb.Messagef("Error updating %s: %v", pretty.ClusterServiceClassName(serviceClass), err))
-//return err
-//}
+	updatedServiceClass, err := c.serviceCatalogClient.ServiceClasses().Update(toUpdate)
+	if err != nil {
+		glog.Error(pcb.Messagef("Error updating %s: %v", pretty.ServiceClassName(serviceClass), err))
+		return err
+	}
 
-//if updatedServiceClass.Status.RemovedFromBrokerCatalog {
-//glog.V(4).Info(pcb.Messagef("Resetting RemovedFromBrokerCatalog status on %s", pretty.ClusterServiceClassName(serviceClass)))
-//updatedServiceClass.Status.RemovedFromBrokerCatalog = false
-//_, err := c.serviceCatalogClient.ClusterServiceClasses().UpdateStatus(updatedServiceClass)
-//if err != nil {
-//s := fmt.Sprintf("Error updating status of %s: %v", pretty.ClusterServiceClassName(updatedServiceClass), err)
-//glog.Warning(pcb.Message(s))
-//c.recorder.Eventf(broker, corev1.EventTypeWarning, errorSyncingCatalogReason, s)
-//if err := c.updateClusterServiceBrokerCondition(broker, v1beta1.ServiceBrokerConditionReady, v1beta1.ConditionFalse, errorSyncingCatalogReason, errorSyncingCatalogMessage+s); err != nil {
-//return err
-//}
-//return err
-//}
-//}
+	if updatedServiceClass.Status.RemovedFromBrokerCatalog {
+		glog.V(4).Info(pcb.Messagef("Resetting RemovedFromBrokerCatalog status on %s", pretty.ServiceClassName(serviceClass)))
+		updatedServiceClass.Status.RemovedFromBrokerCatalog = false
+		_, err := c.serviceCatalogClient.ServiceClasses().UpdateStatus(updatedServiceClass)
+		if err != nil {
+			s := fmt.Sprintf("Error updating status of %s: %v", pretty.ServiceClassName(updatedServiceClass), err)
+			glog.Warning(pcb.Message(s))
+			c.recorder.Eventf(broker, corev1.EventTypeWarning, errorSyncingCatalogReason, s)
+			if err := c.updateServiceBrokerCondition(broker, v1beta1.ServiceBrokerConditionReady, v1beta1.ConditionFalse, errorSyncingCatalogReason, errorSyncingCatalogMessage+s); err != nil {
+				return err
+			}
+			return err
+		}
+	}
 
-//return nil
-//}
+	return nil
+}
 
 //// reconcileClusterServicePlanFromClusterServiceBrokerCatalog reconciles a
 //// ServicePlan after the ServiceClass's catalog has been re-listed.
