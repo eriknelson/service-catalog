@@ -286,18 +286,18 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 			if err := c.reconcileServiceClassFromServiceBrokerCatalog(broker, payloadServiceClass, existingServiceClass); err != nil {
 				s := fmt.Sprintf(
 					"Error reconciling %s (broker %q): %s",
-					pretty.ClusterServiceClassName(payloadServiceClass), broker.Name, err,
+					pretty.ServiceClassName(payloadServiceClass), broker.Name, err,
 				)
 				glog.Warning(pcb.Message(s))
 				c.recorder.Eventf(broker, corev1.EventTypeWarning, errorSyncingCatalogReason, s)
-				if err := c.updateClusterServiceBrokerCondition(broker, v1beta1.ServiceBrokerConditionReady, v1beta1.ConditionFalse, errorSyncingCatalogReason,
+				if err := c.updateServiceBrokerCondition(broker, v1beta1.ServiceBrokerConditionReady, v1beta1.ConditionFalse, errorSyncingCatalogReason,
 					errorSyncingCatalogMessage+s); err != nil {
 					return err
 				}
 				return err
 			}
 
-			glog.V(5).Info(pcb.Messagef("Reconciled %s", pretty.ClusterServiceClassName(payloadServiceClass)))
+			glog.V(5).Info(pcb.Messagef("Reconciled %s", pretty.ServiceClassName(payloadServiceClass)))
 		}
 
 		// handle the serviceClasses that were not in the broker's payload;
@@ -307,17 +307,17 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 				continue
 			}
 
-			glog.V(4).Info(pcb.Messagef("%s has been removed from broker's catalog; marking", pretty.ClusterServiceClassName(existingServiceClass)))
+			glog.V(4).Info(pcb.Messagef("%s has been removed from broker's catalog; marking", pretty.ServiceClassName(existingServiceClass)))
 			existingServiceClass.Status.RemovedFromBrokerCatalog = true
-			_, err := c.serviceCatalogClient.ClusterServiceClasses().UpdateStatus(existingServiceClass)
+			_, err := c.serviceCatalogClient.ServiceClasses(broker.Namespace).UpdateStatus(existingServiceClass)
 			if err != nil {
 				s := fmt.Sprintf(
 					"Error updating status of %s: %v",
-					pretty.ClusterServiceClassName(existingServiceClass), err,
+					pretty.ServiceClassName(existingServiceClass), err,
 				)
 				glog.Warning(pcb.Message(s))
 				c.recorder.Eventf(broker, corev1.EventTypeWarning, errorSyncingCatalogReason, s)
-				if err := c.updateClusterServiceBrokerCondition(broker, v1beta1.ServiceBrokerConditionReady, v1beta1.ConditionFalse, errorSyncingCatalogReason,
+				if err := c.updateServiceBrokerCondition(broker, v1beta1.ServiceBrokerConditionReady, v1beta1.ConditionFalse, errorSyncingCatalogReason,
 					errorSyncingCatalogMessage+s); err != nil {
 					return err
 				}
