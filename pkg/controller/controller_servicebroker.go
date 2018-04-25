@@ -62,11 +62,11 @@ func (c *controller) serviceBrokerAdd(obj interface{}) {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
 		return
 	}
-	c.clusterServiceBrokerQueue.Add(key)
+	c.serviceBrokerQueue.Add(key)
 }
 
 func (c *controller) serviceBrokerUpdate(oldObj, newObj interface{}) {
-	c.clusterServiceBrokerAdd(newObj)
+	c.serviceBrokerAdd(newObj)
 }
 
 func (c *controller) serviceBrokerDelete(obj interface{}) {
@@ -164,7 +164,7 @@ func (c *controller) reconcileServiceBrokerKey(key string) error {
 // error is returned to indicate that the binding has not been fully
 // processed and should be resubmitted at a later time.
 func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error {
-	pcb := pretty.NewContextBuilder(pretty.ClusterServiceBroker, broker.Namespace, broker.Name)
+	pcb := pretty.NewContextBuilder(pretty.ServiceBroker, broker.Namespace, broker.Name)
 	glog.V(4).Infof(pcb.Message("Processing"))
 
 	// * If the broker's ready condition is true and the RelistBehavior has been
@@ -252,7 +252,7 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 		// convert the broker's catalog payload into our API objects
 		glog.V(4).Info(pcb.Message("Converting catalog response into service-catalog API"))
 
-		payloadServiceClasses, payloadServicePlans, err := convertAndFilterCatalogToNamespacedTypes(brokerCatalog, broker.Spec.CatalogRestrictions)
+		payloadServiceClasses, payloadServicePlans, err := convertAndFilterCatalogToNamespacedTypes(broker.Namespace, brokerCatalog, broker.Spec.CatalogRestrictions)
 		if err != nil {
 			s := fmt.Sprintf("Error converting catalog payload for broker %q to service-catalog API: %s", broker.Name, err)
 			glog.Warning(pcb.Message(s))
@@ -331,7 +331,7 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 			delete(existingServicePlanMap, payloadServicePlan.Name)
 
 			glog.V(4).Infof(
-				"ClusterServiceBroker %q: reconciling %s",
+				"ServiceBroker %q: reconciling %s",
 				broker.Name, pretty.ServicePlanName(payloadServicePlan),
 			)
 			if err := c.reconcileServicePlanFromServiceBrokerCatalog(broker, payloadServicePlan, existingServicePlan); err != nil {
@@ -640,7 +640,7 @@ func (c *controller) reconcileServicePlanFromServiceBrokerCatalog(broker *v1beta
 // updateCommonStatusCondition updates the common ready condition for the given CommonServiceBrokerStatus
 // with the given status, reason, and message.
 func updateCommonStatusCondition(meta metav1.ObjectMeta, commonStatus *v1beta1.CommonServiceBrokerStatus, conditionType v1beta1.ServiceBrokerConditionType, status v1beta1.ConditionStatus, reason, message string) {
-	pcb := pretty.NewContextBuilder(pretty.ClusterServiceBroker, meta.Namespace, meta.Name)
+	pcb := pretty.NewContextBuilder(pretty.ServiceBroker, meta.Namespace, meta.Name)
 	newCondition := v1beta1.ServiceBrokerCondition{
 		Type:    conditionType,
 		Status:  status,
@@ -688,7 +688,7 @@ func (c *controller) updateServiceBrokerCondition(broker *v1beta1.ServiceBroker,
 
 	updateCommonStatusCondition(toUpdate.ObjectMeta, &toUpdate.Status.CommonServiceBrokerStatus, conditionType, status, reason, message)
 
-	pcb := pretty.NewContextBuilder(pretty.ClusterServiceBroker, toUpdate.Namespace, toUpdate.Name)
+	pcb := pretty.NewContextBuilder(pretty.ServiceBroker, toUpdate.Namespace, toUpdate.Name)
 	glog.V(4).Info(pcb.Messagef("Updating ready condition to %v", status))
 	_, err := c.serviceCatalogClient.ServiceBrokers(broker.Namespace).UpdateStatus(toUpdate)
 	if err != nil {

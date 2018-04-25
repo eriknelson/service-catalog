@@ -657,7 +657,7 @@ func getBearerConfig(secret *corev1.Secret) (*osb.BearerConfig, error) {
 // into an array of ServiceClasses and an array of ServicePlans and filters
 // these through the restrictions provided. The ServiceClasses and
 // ServicePlans returned by this method are named in K8S with the OSB ID.
-func convertAndFilterCatalogToNamespacedTypes(in *osb.CatalogResponse, restrictions *v1beta1.CatalogRestrictions) ([]*v1beta1.ServiceClass, []*v1beta1.ServicePlan, error) {
+func convertAndFilterCatalogToNamespacedTypes(namespace string, in *osb.CatalogResponse, restrictions *v1beta1.CatalogRestrictions) ([]*v1beta1.ServiceClass, []*v1beta1.ServicePlan, error) {
 	var predicate filter.Predicate
 	var err error
 	if restrictions != nil && len(restrictions.ServiceClass) > 0 {
@@ -700,11 +700,12 @@ func convertAndFilterCatalogToNamespacedTypes(in *osb.CatalogResponse, restricti
 			serviceClass.Spec.ExternalMetadata = &runtime.RawExtension{Raw: metadata}
 		}
 		serviceClass.SetName(svc.ID)
+		serviceClass.SetNamespace(namespace)
 
 		// If this service class passes the predicate, process the plans for the class.
 		if fields := v1beta1.ConvertServiceClassToProperties(serviceClass); predicate.Accepts(fields) {
 			// set up the plans using the ServiceClass Name
-			plans, err := convertServicePlans(svc.Plans, serviceClass.Name)
+			plans, err := convertServicePlans(namespace, svc.Plans, serviceClass.Name)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -857,7 +858,7 @@ func filterServicePlans(restrictions *v1beta1.CatalogRestrictions, servicePlans 
 	return accepted, rejected, nil
 }
 
-func convertServicePlans(plans []osb.Plan, serviceClassID string) ([]*v1beta1.ServicePlan, error) {
+func convertServicePlans(namespace string, plans []osb.Plan, serviceClassID string) ([]*v1beta1.ServicePlan, error) {
 	if 0 == len(plans) {
 		return nil, fmt.Errorf("ServiceClass (K8S: %q) must have at least one plan", serviceClassID)
 	}
@@ -876,6 +877,7 @@ func convertServicePlans(plans []osb.Plan, serviceClassID string) ([]*v1beta1.Se
 		}
 		servicePlans[i] = servicePlan
 		servicePlan.SetName(plan.ID)
+		servicePlan.SetNamespace(namespace)
 
 		err := convertCommonServicePlan(plan, &servicePlan.Spec.CommonServicePlanSpec)
 		if err != nil {
