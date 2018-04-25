@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 
@@ -256,7 +257,7 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 			s := fmt.Sprintf("Error converting catalog payload for broker %q to service-catalog API: %s", broker.Name, err)
 			glog.Warning(pcb.Message(s))
 			c.recorder.Eventf(broker, corev1.EventTypeWarning, errorSyncingCatalogReason, s)
-			if err := c.updateClusterServiceBrokerCondition(broker, v1beta1.ServiceBrokerConditionReady, v1beta1.ConditionFalse, errorSyncingCatalogReason, errorSyncingCatalogMessage+s); err != nil {
+			if err := c.updateServiceBrokerCondition(broker, v1beta1.ServiceBrokerConditionReady, v1beta1.ConditionFalse, errorSyncingCatalogReason, errorSyncingCatalogMessage+s); err != nil {
 				return err
 			}
 			return err
@@ -267,7 +268,7 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 		// get the existing services and plans for this broker so that we can
 		// detect when services and plans are removed from the broker's
 		// catalog
-		existingServiceClasses, existingServicePlans, err := c.getCurrentServiceClassesAndPlansForBroker(broker)
+		existingServiceClasses, existingServicePlans, err := c.getCurrentServiceClassesAndPlansForNamespacedBroker(broker)
 		if err != nil {
 			return err
 		}
@@ -726,47 +727,47 @@ func (c *controller) updateServiceBrokerCondition(broker *v1beta1.ServiceBroker,
 //return err
 //}
 
-//func (c *controller) getCurrentServiceClassesAndPlansForBroker(broker *v1beta1.ClusterServiceBroker) ([]v1beta1.ClusterServiceClass, []v1beta1.ClusterServicePlan, error) {
-//fieldSet := fields.Set{
-//"spec.clusterServiceBrokerName": broker.Name,
-//}
-//fieldSelector := fields.SelectorFromSet(fieldSet).String()
-//listOpts := metav1.ListOptions{FieldSelector: fieldSelector}
+func (c *controller) getCurrentServiceClassesAndPlansForNamespacedBroker(broker *v1beta1.ServiceBroker) ([]v1beta1.ServiceClass, []v1beta1.ServicePlan, error) {
+	fieldSet := fields.Set{
+		v1beta1.FilterSpecServiceBrokerName: broker.Name,
+	}
+	fieldSelector := fields.SelectorFromSet(fieldSet).String()
+	listOpts := metav1.ListOptions{FieldSelector: fieldSelector}
 
-//existingServiceClasses, err := c.serviceCatalogClient.ClusterServiceClasses().List(listOpts)
-//if err != nil {
-//c.recorder.Eventf(broker, corev1.EventTypeWarning, errorListingServiceClassesReason, "%v %v", errorListingServiceClassesMessage, err)
-//if err := c.updateClusterServiceBrokerCondition(
-//broker,
-//v1beta1.ServiceBrokerConditionReady,
-//v1beta1.ConditionUnknown,
-//errorListingServiceClassesReason,
-//errorListingServiceClassesMessage,
-//); err != nil {
-//return nil, nil, err
-//}
+	existingServiceClasses, err := c.serviceCatalogClient.ServiceClasses(broker.Namespace).List(listOpts)
+	if err != nil {
+		c.recorder.Eventf(broker, corev1.EventTypeWarning, errorListingServiceClassesReason, "%v %v", errorListingServiceClassesMessage, err)
+		if err := c.updateServiceBrokerCondition(
+			broker,
+			v1beta1.ServiceBrokerConditionReady,
+			v1beta1.ConditionUnknown,
+			errorListingServiceClassesReason,
+			errorListingServiceClassesMessage,
+		); err != nil {
+			return nil, nil, err
+		}
 
-//return nil, nil, err
-//}
+		return nil, nil, err
+	}
 
-//existingServicePlans, err := c.serviceCatalogClient.ClusterServicePlans().List(listOpts)
-//if err != nil {
-//c.recorder.Eventf(broker, corev1.EventTypeWarning, errorListingServicePlansReason, "%v %v", errorListingServicePlansMessage, err)
-//if err := c.updateClusterServiceBrokerCondition(
-//broker,
-//v1beta1.ServiceBrokerConditionReady,
-//v1beta1.ConditionUnknown,
-//errorListingServicePlansReason,
-//errorListingServicePlansMessage,
-//); err != nil {
-//return nil, nil, err
-//}
+	existingServicePlans, err := c.serviceCatalogClient.ServicePlans().List(listOpts)
+	if err != nil {
+		c.recorder.Eventf(broker, corev1.EventTypeWarning, errorListingServicePlansReason, "%v %v", errorListingServicePlansMessage, err)
+		if err := c.updateServiceBrokerCondition(
+			broker,
+			v1beta1.ServiceBrokerConditionReady,
+			v1beta1.ConditionUnknown,
+			errorListingServicePlansReason,
+			errorListingServicePlansMessage,
+		); err != nil {
+			return nil, nil, err
+		}
 
-//return nil, nil, err
-//}
+		return nil, nil, err
+	}
 
-//return existingServiceClasses.Items, existingServicePlans.Items, nil
-//}
+	return existingServiceClasses.Items, existingServicePlans.Items, nil
+}
 
 //func convertServiceClassListToMap(list []v1beta1.ClusterServiceClass) map[string]*v1beta1.ClusterServiceClass {
 //ret := make(map[string]*v1beta1.ClusterServiceClass, len(list))
