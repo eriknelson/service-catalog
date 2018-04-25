@@ -37,11 +37,6 @@ import (
 // the Message strings have a terminating period and space so they can
 // be easily combined with a follow on specific message.
 const (
-	errorFetchingCatalogReason  string = "ErrorFetchingCatalog"
-	errorFetchingCatalogMessage string = "Error fetching catalog."
-	errorSyncingCatalogReason   string = "ErrorSyncingCatalog"
-	errorSyncingCatalogMessage  string = "Error syncing catalog from ClusterServiceBroker."
-
 	errorListingClusterServiceClassesReason  string = "ErrorListingClusterServiceClasses"
 	errorListingClusterServiceClassesMessage string = "Error listing cluster service classes."
 	errorListingClusterServicePlansReason    string = "ErrorListingClusterServicePlans"
@@ -52,12 +47,16 @@ const (
 	errorDeletingClusterServicePlanMessage   string = "Error deleting cluster service plan."
 	errorAuthCredentialsReason               string = "ErrorGettingAuthCredentials"
 
-	successFetchedCatalogReason               string = "FetchedCatalog"
-	successFetchedCatalogMessage              string = "Successfully fetched catalog entries from broker."
 	successClusterServiceBrokerDeletedReason  string = "DeletedClusterServiceBrokerSuccessfully"
 	successClusterServiceBrokerDeletedMessage string = "The broker %v was deleted successfully."
 
 	// these reasons are re-used in other controller files.
+	errorFetchingCatalogReason            string = "ErrorFetchingCatalog"
+	errorFetchingCatalogMessage           string = "Error fetching catalog."
+	errorSyncingCatalogReason             string = "ErrorSyncingCatalog"
+	errorSyncingCatalogMessage            string = "Error syncing catalog from ClusterServiceBroker."
+	successFetchedCatalogReason           string = "FetchedCatalog"
+	successFetchedCatalogMessage          string = "Successfully fetched catalog entries from broker."
 	errorReconciliationRetryTimeoutReason string = "ErrorReconciliationRetryTimeout"
 )
 

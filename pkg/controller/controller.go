@@ -562,6 +562,48 @@ func getAuthCredentialsFromClusterServiceBroker(client kubernetes.Interface, bro
 	return nil, fmt.Errorf("empty auth info or unsupported auth mode: %s", authInfo)
 }
 
+// Broker utility methods - move?
+// getAuthCredentialsFromServiceBroker returns the auth credentials, if any, or
+// returns an error. If the AuthInfo field is nil, empty values are
+// returned.
+func getAuthCredentialsFromServiceBroker(client kubernetes.Interface, broker *v1beta1.ServiceBroker) (*osb.AuthConfig, error) {
+	// ERIK TODO: This method is mostly error handling boilerplate, is it worth consolidating with common elements?
+	// Main difference are just using the broker's namespace instead of the same namespace as the broker.
+	if broker.Spec.AuthInfo == nil {
+		return nil, nil
+	}
+
+	authInfo := broker.Spec.AuthInfo
+	if authInfo.Basic != nil {
+		secretRef := authInfo.Basic.SecretRef
+		secret, err := client.CoreV1().Secrets(broker.Namespace).Get(secretRef.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		basicAuthConfig, err := getBasicAuthConfig(secret)
+		if err != nil {
+			return nil, err
+		}
+		return &osb.AuthConfig{
+			BasicAuthConfig: basicAuthConfig,
+		}, nil
+	} else if authInfo.Bearer != nil {
+		secretRef := authInfo.Bearer.SecretRef
+		secret, err := client.CoreV1().Secrets(broker.Namespace).Get(secretRef.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		bearerConfig, err := getBearerConfig(secret)
+		if err != nil {
+			return nil, err
+		}
+		return &osb.AuthConfig{
+			BearerConfig: bearerConfig,
+		}, nil
+	}
+	return nil, fmt.Errorf("empty auth info or unsupported auth mode: %s", authInfo)
+}
+
 func getBasicAuthConfig(secret *corev1.Secret) (*osb.BasicAuthConfig, error) {
 	usernameBytes, ok := secret.Data["username"]
 	if !ok {
@@ -692,6 +734,96 @@ func filterServicePlans(restrictions *v1beta1.CatalogRestrictions, servicePlans 
 	return accepted, rejected, nil
 }
 
+func convertServicePlans(plans []osb.Plan, serviceClassID string) ([]*v1beta1.ServicePlan, error) {
+	if 0 == len(plans) {
+		return nil, fmt.Errorf("ServiceClass (K8S: %q) must have at least one plan", serviceClassID)
+	}
+	servicePlans := make([]*v1beta1.ServicePlan, len(plans))
+	for i, plan := range plans {
+		servicePlan = &v1beta1.ServicePlan{
+			Spec: v1beta1.ServicePlanSpec{
+				CommonServicePlanSpec: v1beta1.CommonServicePlanSpec{
+					ExternalName: plan.Name,
+					ExternalID:   plan.ID,
+					Free:         plan.Free != nil && *plan.Free,
+					Description:  plan.Description,
+				},
+				ServiceClassRef: v1beta1.LocalObjectReference{Name: serviceClassID}
+			},
+		}
+		servicePlans[i] = servicePlan
+		servicePlan.SetName(plan.ID)
+
+		err := convertCommonServicePlan(plan, servicePlan)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return servicePlans, nil
+}
+
+func convertCommonServicePlan(plan osb.Plan, commonServicePlanSpec *v1beta1.CommonServicePlanSpec) error {
+	if plan.Bindable != nil {
+		b := plan.Bindable
+		commonServicePlanSpec.Bindable = &b
+	}
+
+	if plan.Metadata != nil {
+		metadata, err := json.Marshal(plan.Metadata)
+		if err != nil {
+			err = fmt.Errorf("Failed to marshal metadata\n%+v\n %v", plan.Metadata, err)
+			glog.Error(err)
+			return err
+		}
+		commonServicePlanSpec.ExternalMetadata = &runtime.RawExtension{Raw: metadata}
+	}
+
+	if schemas := plan.Schemas; schemas != nil {
+		if instanceSchemas := schemas.ServiceInstance; instanceSchemas != nil {
+			if instanceCreateSchema := instanceSchemas.Create; instanceCreateSchema != nil && instanceCreateSchema.Parameters != nil {
+				schema, err := json.Marshal(instanceCreateSchema.Parameters)
+				if err != nil {
+					err = fmt.Errorf("Failed to marshal instance create schema \n%+v\n %v", instanceCreateSchema.Parameters, err)
+					glog.Error(err)
+					return err
+				}
+				commonServicePlanSpec.ServiceInstanceCreateParameterSchema = &runtime.RawExtension{Raw: schema}
+			}
+			if instanceUpdateSchema := instanceSchemas.Update; instanceUpdateSchema != nil && instanceUpdateSchema.Parameters != nil {
+				schema, err := json.Marshal(instanceUpdateSchema.Parameters)
+				if err != nil {
+					err = fmt.Errorf("Failed to marshal instance update schema \n%+v\n %v", instanceUpdateSchema.Parameters, err)
+					glog.Error(err)
+					return err
+				}
+				commonServicePlanSpec.ServiceInstanceUpdateParameterSchema = &runtime.RawExtension{Raw: schema}
+			}
+		}
+		if bindingSchemas := schemas.ServiceBinding; bindingSchemas != nil {
+			if bindingCreateSchema := bindingSchemas.Create; bindingCreateSchema != nil {
+				if bindingCreateSchema.Parameters != nil {
+					schema, err := json.Marshal(bindingCreateSchema.Parameters)
+					if err != nil {
+						err = fmt.Errorf("Failed to marshal binding create schema \n%+v\n %v", bindingCreateSchema.Parameters, err)
+						glog.Error(err)
+						return err
+					}
+					commonServicePlanSpec.ServiceBindingCreateParameterSchema = &runtime.RawExtension{Raw: schema}
+				}
+				if utilfeature.DefaultFeatureGate.Enabled(scfeatures.ResponseSchema) && bindingCreateSchema.Response != nil {
+					schema, err := json.Marshal(bindingCreateSchema.Response)
+					if err != nil {
+						err = fmt.Errorf("Failed to marshal binding create response schema \n%+v\n %v", bindingCreateSchema.Response, err)
+						glog.Error(err)
+						return err
+					}
+					commonServicePlanSpec.ServiceBindingCreateResponseSchema = &runtime.RawExtension{Raw: schema}
+				}
+			}
+		}
+	}
+}
+
 func convertClusterServicePlans(plans []osb.Plan, serviceClassID string) ([]*v1beta1.ClusterServicePlan, error) {
 	if 0 == len(plans) {
 		return nil, fmt.Errorf("ClusterServiceClass (K8S: %q) must have at least one plan", serviceClassID)
@@ -806,14 +938,16 @@ func isServiceInstanceOrphanMitigation(instance *v1beta1.ServiceInstance) bool {
 
 // NewClientConfigurationForBroker creates a new ClientConfiguration for connecting
 // to the specified Broker
-func NewClientConfigurationForBroker(broker *v1beta1.ClusterServiceBroker, authConfig *osb.AuthConfig) *osb.ClientConfiguration {
+func NewClientConfigurationForBroker(brokerName string, commonSpec *v1beta1.CommonServiceBrokerSpec, authConfig *osb.AuthConfig) *osb.ClientConfiguration {
+	// ERIK TODO: Get the ClusterServiceBroker to use this as well? Will not currently compile because
+	// I redid the interface to be this.
 	clientConfig := osb.DefaultClientConfiguration()
-	clientConfig.Name = broker.Name
-	clientConfig.URL = broker.Spec.URL
+	clientConfig.Name = brokerName
+	clientConfig.URL = commonSpec.URL
 	clientConfig.AuthConfig = authConfig
 	clientConfig.EnableAlphaFeatures = true
-	clientConfig.Insecure = broker.Spec.InsecureSkipTLSVerify
-	clientConfig.CAData = broker.Spec.CABundle
+	clientConfig.Insecure = commonSpec.InsecureSkipTLSVerify
+	clientConfig.CAData = commonSpec.CABundle
 	return clientConfig
 }
 
