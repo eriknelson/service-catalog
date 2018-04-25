@@ -75,9 +75,11 @@ func NewController(
 	clusterServiceBrokerInformer informers.ClusterServiceBrokerInformer,
 	serviceBrokerInformer informers.ServiceBrokerInformer,
 	clusterServiceClassInformer informers.ClusterServiceClassInformer,
+	serviceClassInformer informers.ServiceClassInformer,
 	instanceInformer informers.ServiceInstanceInformer,
 	bindingInformer informers.ServiceBindingInformer,
 	clusterServicePlanInformer informers.ClusterServicePlanInformer,
+	servicePlanInformer informers.ServicePlanInformer,
 	brokerClientCreateFunc osb.CreateFunc,
 	brokerRelistInterval time.Duration,
 	osbAPIPreferredVersion string,
@@ -98,7 +100,9 @@ func NewController(
 		clusterServiceBrokerQueue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cluster-service-broker"),
 		serviceBrokerQueue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-broker"),
 		clusterServiceClassQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cluster-service-class"),
+		serviceClassQueue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-class"),
 		clusterServicePlanQueue:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "cluster-service-plan"),
+		servicePlanQueue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-plan"),
 		instanceQueue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-instance"),
 		bindingQueue:                workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "service-binding"),
 		instancePollingQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(pollingStartInterval, operationPollingMaximumBackoffDuration), "instance-poller"),
@@ -149,6 +153,19 @@ func NewController(
 			UpdateFunc: controller.serviceBrokerUpdate,
 			DeleteFunc: controller.serviceBrokerDelete,
 		})
+		// ERIK TODO: Uncomment when the controllers are brought in
+		controller.serviceClassLister = serviceClassInformer.Lister()
+		//serviceClassInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		//AddFunc:    controller.serviceClassAdd,
+		//UpdateFunc: controller.serviceClassUpdate,
+		//DeleteFunc: controller.serviceClassDelete,
+		//})
+		controller.servicePlanLister = servicePlanInformer.Lister()
+		//servicePlanInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		//AddFunc:    controller.servicePlanAdd,
+		//UpdateFunc: controller.servicePlanUpdate,
+		//DeleteFunc: controller.servicePlanDelete,
+		//})
 	}
 
 	return controller, nil
@@ -171,9 +188,11 @@ type controller struct {
 	clusterServiceBrokerLister  listers.ClusterServiceBrokerLister
 	serviceBrokerLister         listers.ServiceBrokerLister
 	clusterServiceClassLister   listers.ClusterServiceClassLister
+	serviceClassLister          listers.ServiceClassLister
 	instanceLister              listers.ServiceInstanceLister
 	bindingLister               listers.ServiceBindingLister
 	clusterServicePlanLister    listers.ClusterServicePlanLister
+	servicePlanLister           listers.ServicePlanLister
 	brokerRelistInterval        time.Duration
 	OSBAPIPreferredVersion      string
 	recorder                    record.EventRecorder
@@ -181,7 +200,9 @@ type controller struct {
 	clusterServiceBrokerQueue   workqueue.RateLimitingInterface
 	serviceBrokerQueue          workqueue.RateLimitingInterface
 	clusterServiceClassQueue    workqueue.RateLimitingInterface
+	serviceClassQueue           workqueue.RateLimitingInterface
 	clusterServicePlanQueue     workqueue.RateLimitingInterface
+	servicePlanQueue            workqueue.RateLimitingInterface
 	instanceQueue               workqueue.RateLimitingInterface
 	bindingQueue                workqueue.RateLimitingInterface
 	instancePollingQueue        workqueue.RateLimitingInterface
