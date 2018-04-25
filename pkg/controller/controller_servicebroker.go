@@ -769,22 +769,22 @@ func (c *controller) getCurrentServiceClassesAndPlansForNamespacedBroker(broker 
 	return existingServiceClasses.Items, existingServicePlans.Items, nil
 }
 
-//func convertServiceClassListToMap(list []v1beta1.ClusterServiceClass) map[string]*v1beta1.ClusterServiceClass {
-//ret := make(map[string]*v1beta1.ClusterServiceClass, len(list))
+func convertServiceClassListToMap(list []v1beta1.ServiceClass) map[string]*v1beta1.ServiceClass {
+	ret := make(map[string]*v1beta1.ServiceClass, len(list))
 
-//for i := range list {
-//ret[list[i].Name] = &list[i]
-//}
+	for i := range list {
+		ret[list[i].Name] = &list[i]
+	}
 
-//return ret
-//}
+	return ret
+}
 
-//func convertServicePlanListToMap(list []v1beta1.ClusterServicePlan) map[string]*v1beta1.ClusterServicePlan {
-//ret := make(map[string]*v1beta1.ClusterServicePlan, len(list))
+func convertServicePlanListToMap(list []v1beta1.ServicePlan) map[string]*v1beta1.ServicePlan {
+	ret := make(map[string]*v1beta1.ServicePlan, len(list))
 
-//for i := range list {
-//ret[list[i].Name] = &list[i]
-//}
+	for i := range list {
+		ret[list[i].Name] = &list[i]
+	}
 
-//return ret
-//}
+	return ret
+}
