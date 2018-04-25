@@ -282,7 +282,7 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 			existingServiceClass, _ := existingServiceClassMap[payloadServiceClass.Name]
 			delete(existingServiceClassMap, payloadServiceClass.Name)
 
-			glog.V(4).Info(pcb.Messagef("Reconciling %s", pretty.ClusterServiceClassName(payloadServiceClass)))
+			glog.V(4).Info(pcb.Messagef("Reconciling %s", pretty.ServiceClassName(payloadServiceClass)))
 			if err := c.reconcileClusterServiceClassFromClusterServiceBrokerCatalog(broker, payloadServiceClass, existingServiceClass); err != nil {
 				s := fmt.Sprintf(
 					"Error reconciling %s (broker %q): %s",
