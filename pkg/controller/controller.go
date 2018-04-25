@@ -429,7 +429,7 @@ func (c *controller) getClusterServiceClassAndClusterServiceBroker(instance *v1b
 		}
 	}
 
-	clientConfig := NewClientConfigurationForBroker(broker, authConfig)
+	clientConfig := NewClientConfigurationForBroker(broker.Name, &broker.Spec.CommonServiceBrokerSpec, authConfig)
 	glog.V(4).Info(pcb.Messagef("Creating client for ClusterServiceBroker %v, URL: %v", broker.Name, broker.Spec.URL))
 	brokerClient, err := c.brokerClientCreateFunc(clientConfig)
 	if err != nil {
@@ -511,7 +511,7 @@ func (c *controller) getClusterServiceClassPlanAndClusterServiceBrokerForService
 		return nil, nil, "", nil, err
 	}
 
-	clientConfig := NewClientConfigurationForBroker(broker, authConfig)
+	clientConfig := NewClientConfigurationForBroker(broker.Name, &broker.Spec.CommonServiceBrokerSpec, authConfig)
 
 	glog.V(4).Infof("Creating client for ClusterServiceBroker %v, URL: %v", broker.Name, broker.Spec.URL)
 	brokerClient, err := c.brokerClientCreateFunc(clientConfig)
@@ -632,6 +632,77 @@ func getBearerConfig(secret *corev1.Secret) (*osb.BearerConfig, error) {
 	}, nil
 }
 
+// convertAndFilterCatalogToNamespacedTypes converts a service broker catalog
+// into an array of ServiceClasses and an array of ServicePlans and filters
+// these through the restrictions provided. The ServiceClasses and
+// ServicePlans returned by this method are named in K8S with the OSB ID.
+func convertAndFilterCatalogToNamespacedTypes(in *osb.CatalogResponse, restrictions *v1beta1.CatalogRestrictions) ([]*v1beta1.ServiceClass, []*v1beta1.ServicePlan, error) {
+	var predicate filter.Predicate
+	var err error
+	if restrictions != nil && len(restrictions.ServiceClass) > 0 {
+		predicate, err = filter.CreatePredicate(restrictions.ServiceClass)
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		predicate = filter.NewPredicate()
+	}
+
+	serviceClasses := []*v1beta1.ServiceClass(nil)
+	servicePlans := []*v1beta1.ServicePlan(nil)
+	for _, svc := range in.Services {
+		serviceClass := &v1beta1.ServiceClass{
+			Spec: v1beta1.ServiceClassSpec{
+				CommonServiceClassSpec: v1beta1.CommonServiceClassSpec{
+					Bindable:      svc.Bindable,
+					PlanUpdatable: svc.PlanUpdatable != nil && *svc.PlanUpdatable,
+					ExternalID:    svc.ID,
+					ExternalName:  svc.Name,
+					Tags:          svc.Tags,
+					Description:   svc.Description,
+					Requires:      svc.Requires,
+				},
+			},
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(scfeatures.AsyncBindingOperations) {
+			serviceClass.Spec.BindingRetrievable = svc.BindingsRetrievable
+		}
+
+		if svc.Metadata != nil {
+			metadata, err := json.Marshal(svc.Metadata)
+			if err != nil {
+				err = fmt.Errorf("Failed to marshal metadata\n%+v\n %v", svc.Metadata, err)
+				glog.Error(err)
+				return nil, nil, err
+			}
+			serviceClass.Spec.ExternalMetadata = &runtime.RawExtension{Raw: metadata}
+		}
+		serviceClass.SetName(svc.ID)
+
+		// If this service class passes the predicate, process the plans for the class.
+		if fields := v1beta1.ConvertServiceClassToProperties(serviceClass); predicate.Accepts(fields) {
+			// set up the plans using the ServiceClass Name
+			plans, err := convertServicePlans(svc.Plans, serviceClass.Name)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			acceptedPlans, _, err := filterNamespacedServicePlans(restrictions, plans)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			// If there are accepted plans, then append the class and all of the accepted plans to the master list.
+			if len(acceptedPlans) > 0 {
+				serviceClasses = append(serviceClasses, serviceClass)
+				servicePlans = append(servicePlans, acceptedPlans...)
+			}
+		}
+	}
+	return serviceClasses, servicePlans, nil
+}
+
 // convertAndFilterCatalog converts a service broker catalog into an array of
 // ClusterServiceClasses and an array of ClusterServicePlans and filters these
 // through the restrictions provided. The ClusterServiceClasses and
@@ -703,6 +774,37 @@ func convertAndFilterCatalog(in *osb.CatalogResponse, restrictions *v1beta1.Cata
 	return serviceClasses, servicePlans, nil
 }
 
+func filterNamespacedServicePlans(restrictions *v1beta1.CatalogRestrictions, servicePlans []*v1beta1.ServicePlan) ([]*v1beta1.ServicePlan, []*v1beta1.ServicePlan, error) {
+	var predicate filter.Predicate
+	var err error
+	if restrictions != nil && len(restrictions.ServicePlan) > 0 {
+		predicate, err = filter.CreatePredicate(restrictions.ServicePlan)
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		predicate = filter.NewPredicate()
+	}
+
+	// If the predicate is empty, all plans will pass. No need to run through the list.
+	if predicate.Empty() {
+		return servicePlans, []*v1beta1.ServicePlan(nil), nil
+	}
+
+	accepted := []*v1beta1.ServicePlan(nil)
+	rejected := []*v1beta1.ServicePlan(nil)
+	for _, sp := range servicePlans {
+		fields := v1beta1.ConvertServicePlanToProperties(sp)
+		if predicate.Accepts(fields) {
+			accepted = append(accepted, sp)
+		} else {
+			rejected = append(rejected, sp)
+		}
+	}
+
+	return accepted, rejected, nil
+}
+
 func filterServicePlans(restrictions *v1beta1.CatalogRestrictions, servicePlans []*v1beta1.ClusterServicePlan) ([]*v1beta1.ClusterServicePlan, []*v1beta1.ClusterServicePlan, error) {
 	var predicate filter.Predicate
 	var err error
@@ -740,7 +842,7 @@ func convertServicePlans(plans []osb.Plan, serviceClassID string) ([]*v1beta1.Se
 	}
 	servicePlans := make([]*v1beta1.ServicePlan, len(plans))
 	for i, plan := range plans {
-		servicePlan = &v1beta1.ServicePlan{
+		servicePlan := &v1beta1.ServicePlan{
 			Spec: v1beta1.ServicePlanSpec{
 				CommonServicePlanSpec: v1beta1.CommonServicePlanSpec{
 					ExternalName: plan.Name,
@@ -748,13 +850,13 @@ func convertServicePlans(plans []osb.Plan, serviceClassID string) ([]*v1beta1.Se
 					Free:         plan.Free != nil && *plan.Free,
 					Description:  plan.Description,
 				},
-				ServiceClassRef: v1beta1.LocalObjectReference{Name: serviceClassID}
+				ServiceClassRef: v1beta1.LocalObjectReference{Name: serviceClassID},
 			},
 		}
 		servicePlans[i] = servicePlan
 		servicePlan.SetName(plan.ID)
 
-		err := convertCommonServicePlan(plan, servicePlan)
+		err := convertCommonServicePlan(plan, &servicePlan.Spec.CommonServicePlanSpec)
 		if err != nil {
 			return nil, err
 		}
@@ -765,7 +867,7 @@ func convertServicePlans(plans []osb.Plan, serviceClassID string) ([]*v1beta1.Se
 func convertCommonServicePlan(plan osb.Plan, commonServicePlanSpec *v1beta1.CommonServicePlanSpec) error {
 	if plan.Bindable != nil {
 		b := plan.Bindable
-		commonServicePlanSpec.Bindable = &b
+		commonServicePlanSpec.Bindable = b
 	}
 
 	if plan.Metadata != nil {
@@ -822,6 +924,7 @@ func convertCommonServicePlan(plan osb.Plan, commonServicePlanSpec *v1beta1.Comm
 			}
 		}
 	}
+	return nil
 }
 
 func convertClusterServicePlans(plans []osb.Plan, serviceClassID string) ([]*v1beta1.ClusterServicePlan, error) {
@@ -939,8 +1042,6 @@ func isServiceInstanceOrphanMitigation(instance *v1beta1.ServiceInstance) bool {
 // NewClientConfigurationForBroker creates a new ClientConfiguration for connecting
 // to the specified Broker
 func NewClientConfigurationForBroker(brokerName string, commonSpec *v1beta1.CommonServiceBrokerSpec, authConfig *osb.AuthConfig) *osb.ClientConfiguration {
-	// ERIK TODO: Get the ClusterServiceBroker to use this as well? Will not currently compile because
-	// I redid the interface to be this.
 	clientConfig := osb.DefaultClientConfiguration()
 	clientConfig.Name = brokerName
 	clientConfig.URL = commonSpec.URL

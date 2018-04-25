@@ -251,7 +251,7 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 		// convert the broker's catalog payload into our API objects
 		glog.V(4).Info(pcb.Message("Converting catalog response into service-catalog API"))
 
-		payloadServiceClasses, payloadServicePlans, err := convertAndFilterCatalog(brokerCatalog, broker.Spec.CatalogRestrictions)
+		payloadServiceClasses, payloadServicePlans, err := convertAndFilterCatalogToNamespacedTypes(brokerCatalog, broker.Spec.CatalogRestrictions)
 		if err != nil {
 			s := fmt.Sprintf("Error converting catalog payload for broker %q to service-catalog API: %s", broker.Name, err)
 			glog.Warning(pcb.Message(s))

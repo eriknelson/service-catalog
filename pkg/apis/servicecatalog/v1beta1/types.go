@@ -1314,6 +1314,8 @@ const (
 	FilterSpecExternalID = "spec.externalID"
 	// SpecClusterServiceClassName is only used for plans, the parent service class name.
 	FilterSpecClusterServiceClassName = "spec.clusterServiceClass.name"
+	// SpecServiceClassName is only used for plans, the parent service class name.
+	FilterSpecServiceClassName = "spec.serviceClass.name"
 )
 
 // SecretTransform is a single transformation that is applied to the
