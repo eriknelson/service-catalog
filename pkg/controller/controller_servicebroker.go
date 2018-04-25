@@ -188,7 +188,7 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 		}
 
 		// clientConfig := NewClientConfigurationForBroker(broker, authConfig)
-		clientConfig := NewClientConfigurationForBroker(broker.Name, &broker.Spec.CommonServiceBrokerSpec, authConfig)
+		clientConfig := NewClientConfigurationForBroker(broker.ObjectMeta, &broker.Spec.CommonServiceBrokerSpec, authConfig)
 
 		glog.V(4).Info(pcb.Messagef("Creating client, URL: %v", broker.Spec.URL))
 		brokerClient, err := c.brokerClientCreateFunc(clientConfig)

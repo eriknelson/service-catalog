@@ -450,7 +450,7 @@ func (c *controller) getClusterServiceClassAndClusterServiceBroker(instance *v1b
 		}
 	}
 
-	clientConfig := NewClientConfigurationForBroker(broker.Name, &broker.Spec.CommonServiceBrokerSpec, authConfig)
+	clientConfig := NewClientConfigurationForBroker(broker.ObjectMeta, &broker.Spec.CommonServiceBrokerSpec, authConfig)
 	glog.V(4).Info(pcb.Messagef("Creating client for ClusterServiceBroker %v, URL: %v", broker.Name, broker.Spec.URL))
 	brokerClient, err := c.brokerClientCreateFunc(clientConfig)
 	if err != nil {
@@ -532,7 +532,7 @@ func (c *controller) getClusterServiceClassPlanAndClusterServiceBrokerForService
 		return nil, nil, "", nil, err
 	}
 
-	clientConfig := NewClientConfigurationForBroker(broker.Name, &broker.Spec.CommonServiceBrokerSpec, authConfig)
+	clientConfig := NewClientConfigurationForBroker(broker.ObjectMeta, &broker.Spec.CommonServiceBrokerSpec, authConfig)
 
 	glog.V(4).Infof("Creating client for ClusterServiceBroker %v, URL: %v", broker.Name, broker.Spec.URL)
 	brokerClient, err := c.brokerClientCreateFunc(clientConfig)
@@ -1062,9 +1062,9 @@ func isServiceInstanceOrphanMitigation(instance *v1beta1.ServiceInstance) bool {
 
 // NewClientConfigurationForBroker creates a new ClientConfiguration for connecting
 // to the specified Broker
-func NewClientConfigurationForBroker(brokerName string, commonSpec *v1beta1.CommonServiceBrokerSpec, authConfig *osb.AuthConfig) *osb.ClientConfiguration {
+func NewClientConfigurationForBroker(meta metav1.ObjectMeta, commonSpec *v1beta1.CommonServiceBrokerSpec, authConfig *osb.AuthConfig) *osb.ClientConfiguration {
 	clientConfig := osb.DefaultClientConfiguration()
-	clientConfig.Name = brokerName
+	clientConfig.Name = meta.Name
 	clientConfig.URL = commonSpec.URL
 	clientConfig.AuthConfig = authConfig
 	clientConfig.EnableAlphaFeatures = true
