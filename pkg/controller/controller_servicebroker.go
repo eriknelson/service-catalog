@@ -283,7 +283,7 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 			delete(existingServiceClassMap, payloadServiceClass.Name)
 
 			glog.V(4).Info(pcb.Messagef("Reconciling %s", pretty.ServiceClassName(payloadServiceClass)))
-			if err := c.reconcileClusterServiceClassFromClusterServiceBrokerCatalog(broker, payloadServiceClass, existingServiceClass); err != nil {
+			if err := c.reconcileServiceClassFromServiceBrokerCatalog(broker, payloadServiceClass, existingServiceClass); err != nil {
 				s := fmt.Sprintf(
 					"Error reconciling %s (broker %q): %s",
 					pretty.ClusterServiceClassName(payloadServiceClass), broker.Name, err,
@@ -471,11 +471,11 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 // catalog payload. The existingServiceClass parameter is the serviceClass
 // that already exists for the given broker with this serviceClass' k8s name.
 func (c *controller) reconcileServiceClassFromServiceBrokerCatalog(broker *v1beta1.ServiceBroker, serviceClass, existingServiceClass *v1beta1.ServiceClass) error {
-	pcb := pretty.NewContextBuilder(pretty.ServiceBroker, "", broker.Name)
+	pcb := pretty.NewContextBuilder(pretty.ServiceBroker, broker.Namespace, broker.Name)
 	serviceClass.Spec.ServiceBrokerName = broker.Name
 
 	if existingServiceClass == nil {
-		otherServiceClass, err := c.clusterServiceClassLister.Get(serviceClass.Name)
+		otherServiceClass, err := c.serviceClassLister.ServiceClasses(broker.Namespace).Get(serviceClass.Name)
 		if err != nil {
 			// we expect _not_ to find a service class this way, so a not-
 			// found error is expected and legitimate.
@@ -496,7 +496,7 @@ func (c *controller) reconcileServiceClassFromServiceBrokerCatalog(broker *v1bet
 		}
 
 		glog.V(5).Info(pcb.Messagef("Fresh %s; creating", pretty.ServiceClassName(serviceClass)))
-		if _, err := c.serviceCatalogClient.ServiceClasses().Create(serviceClass); err != nil {
+		if _, err := c.serviceCatalogClient.ServiceClasses(broker.Namespace).Create(serviceClass); err != nil {
 			glog.Error(pcb.Messagef("Error creating %s: %v", pretty.ServiceClassName(serviceClass), err))
 			return err
 		}
@@ -527,7 +527,7 @@ func (c *controller) reconcileServiceClassFromServiceBrokerCatalog(broker *v1bet
 	toUpdate.Spec.ExternalName = serviceClass.Spec.ExternalName
 	toUpdate.Spec.ExternalMetadata = serviceClass.Spec.ExternalMetadata
 
-	updatedServiceClass, err := c.serviceCatalogClient.ServiceClasses().Update(toUpdate)
+	updatedServiceClass, err := c.serviceCatalogClient.ServiceClasses(broker.Namespace).Update(toUpdate)
 	if err != nil {
 		glog.Error(pcb.Messagef("Error updating %s: %v", pretty.ServiceClassName(serviceClass), err))
 		return err
@@ -536,7 +536,7 @@ func (c *controller) reconcileServiceClassFromServiceBrokerCatalog(broker *v1bet
 	if updatedServiceClass.Status.RemovedFromBrokerCatalog {
 		glog.V(4).Info(pcb.Messagef("Resetting RemovedFromBrokerCatalog status on %s", pretty.ServiceClassName(serviceClass)))
 		updatedServiceClass.Status.RemovedFromBrokerCatalog = false
-		_, err := c.serviceCatalogClient.ServiceClasses().UpdateStatus(updatedServiceClass)
+		_, err := c.serviceCatalogClient.ServiceClasses(broker.Namespace).UpdateStatus(updatedServiceClass)
 		if err != nil {
 			s := fmt.Sprintf("Error updating status of %s: %v", pretty.ServiceClassName(updatedServiceClass), err)
 			glog.Warning(pcb.Message(s))
