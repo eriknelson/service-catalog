@@ -332,20 +332,20 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 
 			glog.V(4).Infof(
 				"ClusterServiceBroker %q: reconciling %s",
-				broker.Name, pretty.ClusterServicePlanName(payloadServicePlan),
+				broker.Name, pretty.ServicePlanName(payloadServicePlan),
 			)
-			if err := c.reconcileClusterServicePlanFromClusterServiceBrokerCatalog(broker, payloadServicePlan, existingServicePlan); err != nil {
+			if err := c.reconcileServicePlanFromServiceBrokerCatalog(broker, payloadServicePlan, existingServicePlan); err != nil {
 				s := fmt.Sprintf(
 					"Error reconciling %s: %s",
-					pretty.ClusterServicePlanName(payloadServicePlan), err,
+					pretty.ServicePlanName(payloadServicePlan), err,
 				)
 				glog.Warning(pcb.Message(s))
 				c.recorder.Eventf(broker, corev1.EventTypeWarning, errorSyncingCatalogReason, s)
-				c.updateClusterServiceBrokerCondition(broker, v1beta1.ServiceBrokerConditionReady, v1beta1.ConditionFalse, errorSyncingCatalogReason,
+				c.updateServiceBrokerCondition(broker, v1beta1.ServiceBrokerConditionReady, v1beta1.ConditionFalse, errorSyncingCatalogReason,
 					errorSyncingCatalogMessage+s)
 				return err
 			}
-			glog.V(5).Info(pcb.Messagef("Reconciled %s", pretty.ClusterServicePlanName(payloadServicePlan)))
+			glog.V(5).Info(pcb.Messagef("Reconciled %s", pretty.ServicePlanName(payloadServicePlan)))
 
 		}
 
@@ -355,18 +355,18 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 			if existingServicePlan.Status.RemovedFromBrokerCatalog {
 				continue
 			}
-			glog.V(4).Info(pcb.Messagef("%s has been removed from broker's catalog; marking", pretty.ClusterServicePlanName(existingServicePlan)))
+			glog.V(4).Info(pcb.Messagef("%s has been removed from broker's catalog; marking", pretty.ServicePlanName(existingServicePlan)))
 			existingServicePlan.Status.RemovedFromBrokerCatalog = true
-			_, err := c.serviceCatalogClient.ClusterServicePlans().UpdateStatus(existingServicePlan)
+			_, err := c.serviceCatalogClient.ServicePlans(broker.Namespace).UpdateStatus(existingServicePlan)
 			if err != nil {
 				s := fmt.Sprintf(
 					"Error updating status of %s: %v",
-					pretty.ClusterServicePlanName(existingServicePlan),
+					pretty.ServicePlanName(existingServicePlan),
 					err,
 				)
 				glog.Warning(pcb.Message(s))
 				c.recorder.Eventf(broker, corev1.EventTypeWarning, errorSyncingCatalogReason, s)
-				if err := c.updateClusterServiceBrokerCondition(broker, v1beta1.ServiceBrokerConditionReady, v1beta1.ConditionFalse, errorSyncingCatalogReason,
+				if err := c.updateServiceBrokerCondition(broker, v1beta1.ServiceBrokerConditionReady, v1beta1.ConditionFalse, errorSyncingCatalogReason,
 					errorSyncingCatalogMessage+s); err != nil {
 					return err
 				}
@@ -376,7 +376,7 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 
 		// everything worked correctly; update the broker's ready condition to
 		// status true
-		if err := c.updateClusterServiceBrokerCondition(broker, v1beta1.ServiceBrokerConditionReady, v1beta1.ConditionTrue, successFetchedCatalogReason, successFetchedCatalogMessage); err != nil {
+		if err := c.updateServiceBrokerCondition(broker, v1beta1.ServiceBrokerConditionReady, v1beta1.ConditionTrue, successFetchedCatalogReason, successFetchedCatalogMessage); err != nil {
 			return err
 		}
 
@@ -395,20 +395,20 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 	if finalizers := sets.NewString(broker.Finalizers...); finalizers.Has(v1beta1.FinalizerServiceCatalog) {
 		glog.V(4).Info(pcb.Message("Finalizing"))
 
-		existingServiceClasses, existingServicePlans, err := c.getCurrentServiceClassesAndPlansForBroker(broker)
+		existingServiceClasses, existingServicePlans, err := c.getCurrentServiceClassesAndPlansForNamespacedBroker(broker)
 		if err != nil {
 			return err
 		}
 
-		glog.V(4).Info(pcb.Messagef("Found %d ClusterServiceClasses and %d ClusterServicePlans to delete", len(existingServiceClasses), len(existingServicePlans)))
+		glog.V(4).Info(pcb.Messagef("Found %d ServiceClasses and %d ServicePlans to delete", len(existingServiceClasses), len(existingServicePlans)))
 
 		for _, plan := range existingServicePlans {
-			glog.V(4).Info(pcb.Messagef("Deleting %s", pretty.ClusterServicePlanName(&plan)))
-			err := c.serviceCatalogClient.ClusterServicePlans().Delete(plan.Name, &metav1.DeleteOptions{})
+			glog.V(4).Info(pcb.Messagef("Deleting %s", pretty.ServicePlanName(&plan)))
+			err := c.serviceCatalogClient.ServicePlans(broker.Namespace).Delete(plan.Name, &metav1.DeleteOptions{})
 			if err != nil && !errors.IsNotFound(err) {
-				s := fmt.Sprintf("Error deleting %s: %s", pretty.ClusterServicePlanName(&plan), err)
+				s := fmt.Sprintf("Error deleting %s: %s", pretty.ServicePlanName(&plan), err)
 				glog.Warning(pcb.Message(s))
-				c.updateClusterServiceBrokerCondition(
+				c.updateServiceBrokerCondition(
 					broker,
 					v1beta1.ServiceBrokerConditionReady,
 					v1beta1.ConditionUnknown,
@@ -421,13 +421,13 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 		}
 
 		for _, svcClass := range existingServiceClasses {
-			glog.V(4).Info(pcb.Messagef("Deleting %s", pretty.ClusterServiceClassName(&svcClass)))
-			err = c.serviceCatalogClient.ClusterServiceClasses().Delete(svcClass.Name, &metav1.DeleteOptions{})
+			glog.V(4).Info(pcb.Messagef("Deleting %s", pretty.ServiceClassName(&svcClass)))
+			err = c.serviceCatalogClient.ServiceClasses(broker.Namespace).Delete(svcClass.Name, &metav1.DeleteOptions{})
 			if err != nil && !errors.IsNotFound(err) {
-				s := fmt.Sprintf("Error deleting %s: %s", pretty.ClusterServiceClassName(&svcClass), err)
+				s := fmt.Sprintf("Error deleting %s: %s", pretty.ServiceClassName(&svcClass), err)
 				glog.Warning(pcb.Message(s))
 				c.recorder.Eventf(broker, corev1.EventTypeWarning, errorDeletingServiceClassReason, "%v %v", errorDeletingServiceClassMessage, s)
-				if err := c.updateClusterServiceBrokerCondition(
+				if err := c.updateServiceBrokerCondition(
 					broker,
 					v1beta1.ServiceBrokerConditionReady,
 					v1beta1.ConditionUnknown,
@@ -440,7 +440,7 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 			}
 		}
 
-		if err := c.updateClusterServiceBrokerCondition(
+		if err := c.updateServiceBrokerCondition(
 			broker,
 			v1beta1.ServiceBrokerConditionReady,
 			v1beta1.ConditionFalse,
@@ -451,7 +451,7 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 		}
 		// Clear the finalizer
 		finalizers.Delete(v1beta1.FinalizerServiceCatalog)
-		c.updateClusterServiceBrokerFinalizers(broker, finalizers.List())
+		c.updateServiceBrokerFinalizers(broker, finalizers.List())
 
 		c.recorder.Eventf(broker, corev1.EventTypeNormal, successServiceBrokerDeletedReason, successServiceBrokerDeletedMessage, broker.Name)
 		glog.V(5).Info(pcb.Message("Successfully deleted"))
@@ -551,97 +551,96 @@ func (c *controller) reconcileServiceClassFromServiceBrokerCatalog(broker *v1bet
 	return nil
 }
 
-//// reconcileClusterServicePlanFromClusterServiceBrokerCatalog reconciles a
-//// ServicePlan after the ServiceClass's catalog has been re-listed.
-//func (c *controller) reconcileClusterServicePlanFromClusterServiceBrokerCatalog(broker *v1beta1.ClusterServiceBroker, servicePlan, existingServicePlan *v1beta1.ClusterServicePlan) error {
-//pcb := pretty.NewContextBuilder(pretty.ClusterServiceBroker, "", broker.Name)
-//servicePlan.Spec.ClusterServiceBrokerName = broker.Name
+// reconcileServicePlanFromServiceBrokerCatalog reconciles a
+// ServicePlan after the ServiceClass's catalog has been re-listed.
+func (c *controller) reconcileServicePlanFromServiceBrokerCatalog(broker *v1beta1.ServiceBroker, servicePlan, existingServicePlan *v1beta1.ServicePlan) error {
+	pcb := pretty.NewContextBuilder(pretty.ServiceBroker, broker.Namespace, broker.Name)
+	servicePlan.Spec.ServiceBrokerName = broker.Name
 
-//if existingServicePlan == nil {
-//otherServicePlan, err := c.clusterServicePlanLister.Get(servicePlan.Name)
-//if err != nil {
-//// we expect _not_ to find a service class this way, so a not-
-//// found error is expected and legitimate.
-//if !errors.IsNotFound(err) {
-//return err
-//}
-//} else {
-//// we do not expect to find an existing service class if we were
-//// not already passed one; the following if statement will almost
-//// certainly evaluate to true.
-//if otherServicePlan.Spec.ClusterServiceBrokerName != broker.Name {
-//errMsg := fmt.Sprintf(
-//"%s already exists for Broker %q",
-//pretty.ClusterServicePlanName(servicePlan), otherServicePlan.Spec.ClusterServiceBrokerName,
-//)
-//glog.Error(pcb.Message(errMsg))
-//return fmt.Errorf(errMsg)
-//}
-//}
+	if existingServicePlan == nil {
+		otherServicePlan, err := c.servicePlanLister.ServicePlans(broker.Namespace).Get(servicePlan.Name)
+		if err != nil {
+			// we expect _not_ to find a service class this way, so a not-
+			// found error is expected and legitimate.
+			if !errors.IsNotFound(err) {
+				return err
+			}
+		} else {
+			// we do not expect to find an existing service class if we were
+			// not already passed one; the following if statement will almost
+			// certainly evaluate to true.
+			if otherServicePlan.Spec.ServiceBrokerName != broker.Name {
+				errMsg := fmt.Sprintf(
+					"%s already exists for Broker %q",
+					pretty.ServicePlanName(servicePlan), otherServicePlan.Spec.ServiceBrokerName,
+				)
+				glog.Error(pcb.Message(errMsg))
+				return fmt.Errorf(errMsg)
+			}
+		}
 
-//// An error returned from a lister Get call means that the object does
-//// not exist.  Create a new ClusterServicePlan.
-//if _, err := c.serviceCatalogClient.ClusterServicePlans().Create(servicePlan); err != nil {
-//glog.Error(pcb.Messagef("Error creating %s: %v", pretty.ClusterServicePlanName(servicePlan), err))
-//return err
-//}
+		// An error returned from a lister Get call means that the object does
+		// not exist.  Create a new ServicePlan.
+		if _, err := c.serviceCatalogClient.ServicePlans(broker.Namespace).Create(servicePlan); err != nil {
+			glog.Error(pcb.Messagef("Error creating %s: %v", pretty.ServicePlanName(servicePlan), err))
+			return err
+		}
 
-//return nil
-//}
+		return nil
+	}
 
-//if existingServicePlan.Spec.ExternalID != servicePlan.Spec.ExternalID {
-//errMsg := fmt.Sprintf(
-//"%s already exists with OSB guid %q, received different guid %q",
-//pretty.ClusterServicePlanName(servicePlan), existingServicePlan.Spec.ExternalID, servicePlan.Spec.ExternalID,
-//)
-//glog.Error(pcb.Message(errMsg))
-//return fmt.Errorf(errMsg)
-//}
+	if existingServicePlan.Spec.ExternalID != servicePlan.Spec.ExternalID {
+		errMsg := fmt.Sprintf(
+			"%s already exists with OSB guid %q, received different guid %q",
+			pretty.ServicePlanName(servicePlan), existingServicePlan.Spec.ExternalID, servicePlan.Spec.ExternalID,
+		)
+		glog.Error(pcb.Message(errMsg))
+		return fmt.Errorf(errMsg)
+	}
 
-//glog.V(5).Info(pcb.Messagef("Found existing %s; updating", pretty.ClusterServicePlanName(servicePlan)))
+	glog.V(5).Info(pcb.Messagef("Found existing %s; updating", pretty.ServicePlanName(servicePlan)))
 
-//// There was an existing service plan -- project the update onto it and
-//// update it.
-//toUpdate := existingServicePlan.DeepCopy()
-//toUpdate.Spec.Description = servicePlan.Spec.Description
-//toUpdate.Spec.Bindable = servicePlan.Spec.Bindable
-//toUpdate.Spec.Free = servicePlan.Spec.Free
-//toUpdate.Spec.ExternalName = servicePlan.Spec.ExternalName
-//toUpdate.Spec.ExternalMetadata = servicePlan.Spec.ExternalMetadata
-//toUpdate.Spec.ServiceInstanceCreateParameterSchema = servicePlan.Spec.ServiceInstanceCreateParameterSchema
-//toUpdate.Spec.ServiceInstanceUpdateParameterSchema = servicePlan.Spec.ServiceInstanceUpdateParameterSchema
-//toUpdate.Spec.ServiceBindingCreateParameterSchema = servicePlan.Spec.ServiceBindingCreateParameterSchema
+	// There was an existing service plan -- project the update onto it and
+	// update it.
+	toUpdate := existingServicePlan.DeepCopy()
+	toUpdate.Spec.Description = servicePlan.Spec.Description
+	toUpdate.Spec.Bindable = servicePlan.Spec.Bindable
+	toUpdate.Spec.Free = servicePlan.Spec.Free
+	toUpdate.Spec.ExternalName = servicePlan.Spec.ExternalName
+	toUpdate.Spec.ExternalMetadata = servicePlan.Spec.ExternalMetadata
+	toUpdate.Spec.ServiceInstanceCreateParameterSchema = servicePlan.Spec.ServiceInstanceCreateParameterSchema
+	toUpdate.Spec.ServiceInstanceUpdateParameterSchema = servicePlan.Spec.ServiceInstanceUpdateParameterSchema
+	toUpdate.Spec.ServiceBindingCreateParameterSchema = servicePlan.Spec.ServiceBindingCreateParameterSchema
 
-//updatedPlan, err := c.serviceCatalogClient.ClusterServicePlans().Update(toUpdate)
-//if err != nil {
-//glog.Error(pcb.Messagef("Error updating %s: %v", pretty.ClusterServicePlanName(servicePlan), err))
-//return err
-//}
+	updatedPlan, err := c.serviceCatalogClient.ServicePlans(broker.Namespace).Update(toUpdate)
+	if err != nil {
+		glog.Error(pcb.Messagef("Error updating %s: %v", pretty.ServicePlanName(servicePlan), err))
+		return err
+	}
 
-//if updatedPlan.Status.RemovedFromBrokerCatalog {
-//updatedPlan.Status.RemovedFromBrokerCatalog = false
-//glog.V(4).Info(pcb.Messagef("Resetting RemovedFromBrokerCatalog status on %s", pretty.ClusterServicePlanName(updatedPlan)))
+	if updatedPlan.Status.RemovedFromBrokerCatalog {
+		updatedPlan.Status.RemovedFromBrokerCatalog = false
+		glog.V(4).Info(pcb.Messagef("Resetting RemovedFromBrokerCatalog status on %s", pretty.ServicePlanName(updatedPlan)))
 
-//_, err := c.serviceCatalogClient.ClusterServicePlans().UpdateStatus(updatedPlan)
-//if err != nil {
-//s := fmt.Sprintf("Error updating status of %s: %v", pretty.ClusterServicePlanName(updatedPlan), err)
-//glog.Error(pcb.Message(s))
-//c.recorder.Eventf(broker, corev1.EventTypeWarning, errorSyncingCatalogReason, s)
-//if err := c.updateClusterServiceBrokerCondition(broker, v1beta1.ServiceBrokerConditionReady, v1beta1.ConditionFalse, errorSyncingCatalogReason, errorSyncingCatalogMessage+s); err != nil {
-//return err
-//}
-//return err
-//}
-//}
+		_, err := c.serviceCatalogClient.ServicePlans(broker.Namespace).UpdateStatus(updatedPlan)
+		if err != nil {
+			s := fmt.Sprintf("Error updating status of %s: %v", pretty.ServicePlanName(updatedPlan), err)
+			glog.Error(pcb.Message(s))
+			c.recorder.Eventf(broker, corev1.EventTypeWarning, errorSyncingCatalogReason, s)
+			if err := c.updateServiceBrokerCondition(broker, v1beta1.ServiceBrokerConditionReady, v1beta1.ConditionFalse, errorSyncingCatalogReason, errorSyncingCatalogMessage+s); err != nil {
+				return err
+			}
+			return err
+		}
+	}
 
-//return nil
-//}
+	return nil
+}
 
-// internalUpdateCommonStatus updates the common ready condition for the given CommonServiceBrokerStatus
+// updateCommonStatusCondition updates the common ready condition for the given CommonServiceBrokerStatus
 // with the given status, reason, and message.
-func (c *controller) internalUpdateCommonStatus(namespace string, commonStatus *v1beta1.CommonServiceBrokerStatus, conditionType v1beta1.ServiceBrokerConditionType, status v1beta1.ConditionStatus, reason, message string) {
-	// ERIK TODO: Get the ClusterServiceBroker to use this?
-	pcb := pretty.NewContextBuilder(pretty.ClusterServiceBroker, namespace, broker.Name)
+func updateCommonStatusCondition(meta metav1.ObjectMeta, commonStatus *v1beta1.CommonServiceBrokerStatus, conditionType v1beta1.ServiceBrokerConditionType, status v1beta1.ConditionStatus, reason, message string) {
+	pcb := pretty.NewContextBuilder(pretty.ClusterServiceBroker, meta.Namespace, meta.Name)
 	newCondition := v1beta1.ServiceBrokerCondition{
 		Type:    conditionType,
 		Status:  status,
@@ -676,7 +675,7 @@ func (c *controller) internalUpdateCommonStatus(namespace string, commonStatus *
 
 	// Set status.ReconciledGeneration && status.LastCatalogRetrievalTime if updating ready condition to true
 	if conditionType == v1beta1.ServiceBrokerConditionReady && status == v1beta1.ConditionTrue {
-		commonStatus.ReconciledGeneration = toUpdate.Generation
+		commonStatus.ReconciledGeneration = meta.Generation
 		now := metav1.NewTime(t)
 		commonStatus.LastCatalogRetrievalTime = &now
 	}
@@ -687,10 +686,11 @@ func (c *controller) internalUpdateCommonStatus(namespace string, commonStatus *
 func (c *controller) updateServiceBrokerCondition(broker *v1beta1.ServiceBroker, conditionType v1beta1.ServiceBrokerConditionType, status v1beta1.ConditionStatus, reason, message string) error {
 	toUpdate := broker.DeepCopy()
 
-	internalUpdateCommonStatus(broker.Namespace, &toUpdate.Status.CommonServiceBrokerStatus, conditionType, status, reson, message)
+	updateCommonStatusCondition(toUpdate.ObjectMeta, &toUpdate.Status.CommonServiceBrokerStatus, conditionType, status, reason, message)
 
+	pcb := pretty.NewContextBuilder(pretty.ClusterServiceBroker, toUpdate.Namespace, toUpdate.Name)
 	glog.V(4).Info(pcb.Messagef("Updating ready condition to %v", status))
-	_, err := c.serviceCatalogClient.ServiceBrokers().UpdateStatus(toUpdate)
+	_, err := c.serviceCatalogClient.ServiceBrokers(broker.Namespace).UpdateStatus(toUpdate)
 	if err != nil {
 		glog.Error(pcb.Messagef("Error updating ready condition: %v", err))
 	} else {
@@ -700,32 +700,32 @@ func (c *controller) updateServiceBrokerCondition(broker *v1beta1.ServiceBroker,
 	return err
 }
 
-//// updateClusterServiceBrokerFinalizers updates the given finalizers for the given Broker.
-//func (c *controller) updateClusterServiceBrokerFinalizers(
-//broker *v1beta1.ClusterServiceBroker,
-//finalizers []string) error {
-//pcb := pretty.NewContextBuilder(pretty.ClusterServiceBroker, "", broker.Name)
+// updateServiceBrokerFinalizers updates the given finalizers for the given Broker.
+func (c *controller) updateServiceBrokerFinalizers(
+	broker *v1beta1.ServiceBroker,
+	finalizers []string) error {
+	pcb := pretty.NewContextBuilder(pretty.ServiceBroker, broker.Namespace, broker.Name)
 
-//// Get the latest version of the broker so that we can avoid conflicts
-//// (since we have probably just updated the status of the broker and are
-//// now removing the last finalizer).
-//broker, err := c.serviceCatalogClient.ClusterServiceBrokers().Get(broker.Name, metav1.GetOptions{})
-//if err != nil {
-//glog.Error(pcb.Messagef("Error finalizing: %v", err))
-//}
+	// Get the latest version of the broker so that we can avoid conflicts
+	// (since we have probably just updated the status of the broker and are
+	// now removing the last finalizer).
+	broker, err := c.serviceCatalogClient.ServiceBrokers(broker.Namespace).Get(broker.Name, metav1.GetOptions{})
+	if err != nil {
+		glog.Error(pcb.Messagef("Error finalizing: %v", err))
+	}
 
-//toUpdate := broker.DeepCopy()
-//toUpdate.Finalizers = finalizers
+	toUpdate := broker.DeepCopy()
+	toUpdate.Finalizers = finalizers
 
-//logContext := fmt.Sprint(pcb.Messagef("Updating finalizers to %v", finalizers))
+	logContext := fmt.Sprint(pcb.Messagef("Updating finalizers to %v", finalizers))
 
-//glog.V(4).Info(pcb.Messagef("Updating %v", logContext))
-//_, err = c.serviceCatalogClient.ClusterServiceBrokers().UpdateStatus(toUpdate)
-//if err != nil {
-//glog.Error(pcb.Messagef("Error updating %v: %v", logContext, err))
-//}
-//return err
-//}
+	glog.V(4).Info(pcb.Messagef("Updating %v", logContext))
+	_, err = c.serviceCatalogClient.ServiceBrokers(broker.Namespace).UpdateStatus(toUpdate)
+	if err != nil {
+		glog.Error(pcb.Messagef("Error updating %v: %v", logContext, err))
+	}
+	return err
+}
 
 func (c *controller) getCurrentServiceClassesAndPlansForNamespacedBroker(broker *v1beta1.ServiceBroker) ([]v1beta1.ServiceClass, []v1beta1.ServicePlan, error) {
 	fieldSet := fields.Set{
@@ -750,7 +750,7 @@ func (c *controller) getCurrentServiceClassesAndPlansForNamespacedBroker(broker 
 		return nil, nil, err
 	}
 
-	existingServicePlans, err := c.serviceCatalogClient.ServicePlans().List(listOpts)
+	existingServicePlans, err := c.serviceCatalogClient.ServicePlans(broker.Namespace).List(listOpts)
 	if err != nil {
 		c.recorder.Eventf(broker, corev1.EventTypeWarning, errorListingServicePlansReason, "%v %v", errorListingServicePlansMessage, err)
 		if err := c.updateServiceBrokerCondition(
