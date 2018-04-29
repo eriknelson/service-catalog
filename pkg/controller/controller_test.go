@@ -1898,10 +1898,6 @@ func newTestController(t *testing.T, config fakeosb.FakeClientConfiguration) (
 
 	fakeRecorder := record.NewFakeRecorder(5)
 
-	t.Logf("NSK: ClusterServicePlans informer: %+v", serviceCatalogSharedInformers.ClusterServicePlans())
-	t.Logf("NSK: ServicePlans informer: %+v", serviceCatalogSharedInformers.ServicePlans())
-	t.Logf("NSK: ServiceInstances informer: %+v", serviceCatalogSharedInformers.ServiceInstances())
-
 	// create a test controller
 	testController, err := NewController(
 		fakeKubeClient,
