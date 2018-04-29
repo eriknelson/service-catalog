@@ -17,27 +17,30 @@ limitations under the License.
 package controller
 
 import (
-	//"errors"
+	"errors"
 	//"reflect"
 	"testing"
-	"time"
+	//"time"
+	"fmt"
 
 	//osb "github.com/pmorie/go-open-service-broker-client/v2"
 	//fakeosb "github.com/pmorie/go-open-service-broker-client/v2/fake"
 
 	"github.com/kubernetes-incubator/service-catalog/pkg/apis/servicecatalog/v1beta1"
-	//"github.com/kubernetes-incubator/service-catalog/test/fake"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	scfeatures "github.com/kubernetes-incubator/service-catalog/pkg/features"
+	"github.com/kubernetes-incubator/service-catalog/test/fake"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	//"k8s.io/apimachinery/pkg/fields"
 	//"k8s.io/apimachinery/pkg/labels"
-	//"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	//"k8s.io/apimachinery/pkg/util/diff"
 	//"strings"
 	//corev1 "k8s.io/api/core/v1"
-	//clientgotesting "k8s.io/client-go/testing"
+	clientgotesting "k8s.io/client-go/testing"
 )
 
+// NSK: ShouldReconcileServiceBroker is already tested by the controller_test.go
 // TestShouldReconcileServiceBroker ensures that with the expected conditions the
 // reconciler is reported as needing to run.
 //
@@ -49,171 +52,171 @@ import (
 // - broker with status/ready, past relist interval will reconcile
 // - broker with status/ready, within relist interval will NOT reconcile
 // - broker with status/ready/checksum, will reconcile
-func TestShouldReconcileServiceBroker(t *testing.T) {
-	// Anonymous struct fields:
-	// name: short description of the test
-	// broker: broker object to test
-	// now: what time the interval is calculated with respect to interval
-	// reconcile: whether or not the reconciler should run, the return of
-	// shouldReconcileServiceBroker
-	cases := []struct {
-		name      string
-		broker    *v1beta1.ServiceBroker
-		now       time.Time
-		reconcile bool
-		err       error
-	}{
-		{
-			name: "no status",
-			broker: func() *v1beta1.ServiceBroker {
-				broker := getTestServiceBroker()
-				broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Minute}
-				return broker
-			}(),
-			now:       time.Now(),
-			reconcile: true,
-		},
-		//{
-		//name: "deletionTimestamp set",
-		//broker: func() *v1beta1.ServiceBroker {
-		//broker := getTestServiceBrokerWithStatus(v1beta1.ConditionTrue)
-		//broker.DeletionTimestamp = &metav1.Time{}
-		//broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Hour}
-		//return broker
-		//}(),
-		//now:       time.Now(),
-		//reconcile: true,
-		//},
-		//{
-		//name: "no ready condition",
-		//broker: func() *v1beta1.ServiceBroker {
-		//broker := getTestServiceBroker()
-		//broker.Status = v1beta1.ServiceBrokerStatus{
-		//CommonServiceBrokerStatus: v1beta1.CommonServiceBrokerStatus{
-		//Conditions: []v1beta1.ServiceBrokerCondition{
-		//{
-		//Type:   v1beta1.ServiceBrokerConditionType("NotARealCondition"),
-		//Status: v1beta1.ConditionTrue,
-		//},
-		//},
-		//},
-		//}
-		//broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Minute}
-		//return broker
-		//}(),
-		//now:       time.Now(),
-		//reconcile: true,
-		//},
-		//{
-		//name: "not ready",
-		//broker: func() *v1beta1.ServiceBroker {
-		//broker := getTestServiceBrokerWithStatus(v1beta1.ConditionFalse)
-		//broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Minute}
-		//return broker
-		//}(),
-		//now:       time.Now(),
-		//reconcile: true,
-		//},
-		//{
-		//name: "ready, interval elapsed",
-		//broker: func() *v1beta1.ServiceBroker {
-		//broker := getTestServiceBrokerWithStatus(v1beta1.ConditionTrue)
-		//broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Minute}
-		//return broker
-		//}(),
-		//now:       time.Now(),
-		//reconcile: true,
-		//},
-		//{
-		//name: "good steady state - ready, interval not elapsed, but last state change was a long time ago",
-		//broker: func() *v1beta1.ServiceBroker {
-		//lastTransitionTime := metav1.NewTime(time.Now().Add(-30 * time.Minute))
-		//lastRelistTime := metav1.NewTime(time.Now().Add(-2 * time.Minute))
-		//broker := getTestServiceBrokerWithStatusAndTime(v1beta1.ConditionTrue, lastTransitionTime, lastRelistTime)
-		//broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Minute}
-		//return broker
-		//}(),
-		//now:       time.Now(),
-		//reconcile: false,
-		//},
-		//{
-		//name: "good steady state - ready, interval has elapsed, last state change was a long time ago",
-		//broker: func() *v1beta1.ServiceBroker {
-		//lastTransitionTime := metav1.NewTime(time.Now().Add(-30 * time.Minute))
-		//lastRelistTime := metav1.NewTime(time.Now().Add(-4 * time.Minute))
-		//broker := getTestServiceBrokerWithStatusAndTime(v1beta1.ConditionTrue, lastTransitionTime, lastRelistTime)
-		//broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Minute}
-		//return broker
-		//}(),
-		//now:       time.Now(),
-		//reconcile: true,
-		//},
-		//{
-		//name: "ready, interval not elapsed",
-		//broker: func() *v1beta1.ServiceBroker {
-		//broker := getTestServiceBrokerWithStatus(v1beta1.ConditionTrue)
-		//broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Hour}
-		//return broker
-		//}(),
-		//now:       time.Now(),
-		//reconcile: false,
-		//},
-		//{
-		//name: "ready, interval not elapsed, spec changed",
-		//broker: func() *v1beta1.ServiceBroker {
-		//broker := getTestServiceBrokerWithStatus(v1beta1.ConditionTrue)
-		//broker.Generation = 2
-		//broker.Status.ReconciledGeneration = 1
-		//broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Hour}
-		//return broker
-		//}(),
-		//now:       time.Now(),
-		//reconcile: true,
-		//},
-		//{
-		//name: "ready, duration behavior, nil duration",
-		//broker: func() *v1beta1.ServiceBroker {
-		//broker := getTestServiceBrokerWithStatus(v1beta1.ConditionTrue)
-		//broker.Spec.RelistBehavior = v1beta1.ServiceBrokerRelistBehaviorDuration
-		//broker.Spec.RelistDuration = nil
-		//return broker
-		//}(),
-		//now:       time.Now(),
-		//reconcile: false,
-		//},
-		//{
-		//name: "ready, manual behavior",
-		//broker: func() *v1beta1.ServiceBroker {
-		//broker := getTestServiceBrokerWithStatus(v1beta1.ConditionTrue)
-		//broker.Spec.RelistBehavior = v1beta1.ServiceBrokerRelistBehaviorManual
-		//return broker
-		//}(),
-		//now:       time.Now(),
-		//reconcile: false,
-		//},
-	}
+//func TestShouldReconcileServiceBroker(t *testing.T) {
+// Anonymous struct fields:
+// name: short description of the test
+// broker: broker object to test
+// now: what time the interval is calculated with respect to interval
+// reconcile: whether or not the reconciler should run, the return of
+// shouldReconcileServiceBroker
+//cases := []struct {
+//name      string
+//broker    *v1beta1.ServiceBroker
+//now       time.Time
+//reconcile bool
+//err       error
+//}{
+//{
+//name: "no status",
+//broker: func() *v1beta1.ServiceBroker {
+//broker := getTestServiceBroker()
+//broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Minute}
+//return broker
+//}(),
+//now:       time.Now(),
+//reconcile: true,
+//},
+//{
+//name: "deletionTimestamp set",
+//broker: func() *v1beta1.ServiceBroker {
+//broker := getTestServiceBrokerWithStatus(v1beta1.ConditionTrue)
+//broker.DeletionTimestamp = &metav1.Time{}
+//broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Hour}
+//return broker
+//}(),
+//now:       time.Now(),
+//reconcile: true,
+//},
+//{
+//name: "no ready condition",
+//broker: func() *v1beta1.ServiceBroker {
+//broker := getTestServiceBroker()
+//broker.Status = v1beta1.ServiceBrokerStatus{
+//CommonServiceBrokerStatus: v1beta1.CommonServiceBrokerStatus{
+//Conditions: []v1beta1.ServiceBrokerCondition{
+//{
+//Type:   v1beta1.ServiceBrokerConditionType("NotARealCondition"),
+//Status: v1beta1.ConditionTrue,
+//},
+//},
+//},
+//}
+//broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Minute}
+//return broker
+//}(),
+//now:       time.Now(),
+//reconcile: true,
+//},
+//{
+//name: "not ready",
+//broker: func() *v1beta1.ServiceBroker {
+//broker := getTestServiceBrokerWithStatus(v1beta1.ConditionFalse)
+//broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Minute}
+//return broker
+//}(),
+//now:       time.Now(),
+//reconcile: true,
+//},
+//{
+//name: "ready, interval elapsed",
+//broker: func() *v1beta1.ServiceBroker {
+//broker := getTestServiceBrokerWithStatus(v1beta1.ConditionTrue)
+//broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Minute}
+//return broker
+//}(),
+//now:       time.Now(),
+//reconcile: true,
+//},
+//{
+//name: "good steady state - ready, interval not elapsed, but last state change was a long time ago",
+//broker: func() *v1beta1.ServiceBroker {
+//lastTransitionTime := metav1.NewTime(time.Now().Add(-30 * time.Minute))
+//lastRelistTime := metav1.NewTime(time.Now().Add(-2 * time.Minute))
+//broker := getTestServiceBrokerWithStatusAndTime(v1beta1.ConditionTrue, lastTransitionTime, lastRelistTime)
+//broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Minute}
+//return broker
+//}(),
+//now:       time.Now(),
+//reconcile: false,
+//},
+//{
+//name: "good steady state - ready, interval has elapsed, last state change was a long time ago",
+//broker: func() *v1beta1.ServiceBroker {
+//lastTransitionTime := metav1.NewTime(time.Now().Add(-30 * time.Minute))
+//lastRelistTime := metav1.NewTime(time.Now().Add(-4 * time.Minute))
+//broker := getTestServiceBrokerWithStatusAndTime(v1beta1.ConditionTrue, lastTransitionTime, lastRelistTime)
+//broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Minute}
+//return broker
+//}(),
+//now:       time.Now(),
+//reconcile: true,
+//},
+//{
+//name: "ready, interval not elapsed",
+//broker: func() *v1beta1.ServiceBroker {
+//broker := getTestServiceBrokerWithStatus(v1beta1.ConditionTrue)
+//broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Hour}
+//return broker
+//}(),
+//now:       time.Now(),
+//reconcile: false,
+//},
+//{
+//name: "ready, interval not elapsed, spec changed",
+//broker: func() *v1beta1.ServiceBroker {
+//broker := getTestServiceBrokerWithStatus(v1beta1.ConditionTrue)
+//broker.Generation = 2
+//broker.Status.ReconciledGeneration = 1
+//broker.Spec.RelistDuration = &metav1.Duration{Duration: 3 * time.Hour}
+//return broker
+//}(),
+//now:       time.Now(),
+//reconcile: true,
+//},
+//{
+//name: "ready, duration behavior, nil duration",
+//broker: func() *v1beta1.ServiceBroker {
+//broker := getTestServiceBrokerWithStatus(v1beta1.ConditionTrue)
+//broker.Spec.RelistBehavior = v1beta1.ServiceBrokerRelistBehaviorDuration
+//broker.Spec.RelistDuration = nil
+//return broker
+//}(),
+//now:       time.Now(),
+//reconcile: false,
+//},
+//{
+//name: "ready, manual behavior",
+//broker: func() *v1beta1.ServiceBroker {
+//broker := getTestServiceBrokerWithStatus(v1beta1.ConditionTrue)
+//broker.Spec.RelistBehavior = v1beta1.ServiceBrokerRelistBehaviorManual
+//return broker
+//}(),
+//now:       time.Now(),
+//reconcile: false,
+//},
+//}
 
-	for _, tc := range cases {
-		var ltt *time.Time
-		if len(tc.broker.Status.Conditions) != 0 {
-			ltt = &tc.broker.Status.Conditions[0].LastTransitionTime.Time
-		}
+//for _, tc := range cases {
+//var ltt *time.Time
+//if len(tc.broker.Status.Conditions) != 0 {
+//ltt = &tc.broker.Status.Conditions[0].LastTransitionTime.Time
+//}
 
-		if tc.broker.Spec.RelistDuration != nil {
-			interval := tc.broker.Spec.RelistDuration.Duration
-			lastRelistTime := tc.broker.Status.LastCatalogRetrievalTime
-			t.Logf("%v: now: %v, interval: %v, last transition time: %v, last relist time: %v", tc.name, tc.now, interval, ltt, lastRelistTime)
-		} else {
-			t.Logf("broker.Spec.RelistDuration set to nil")
-		}
+//if tc.broker.Spec.RelistDuration != nil {
+//interval := tc.broker.Spec.RelistDuration.Duration
+//lastRelistTime := tc.broker.Status.LastCatalogRetrievalTime
+//t.Logf("%v: now: %v, interval: %v, last transition time: %v, last relist time: %v", tc.name, tc.now, interval, ltt, lastRelistTime)
+//} else {
+//t.Logf("broker.Spec.RelistDuration set to nil")
+//}
 
-		actual := shouldReconcileServiceBroker(tc.broker, tc.now)
+//actual := shouldReconcileServiceBroker(tc.broker, tc.now)
 
-		if e, a := tc.reconcile, actual; e != a {
-			t.Errorf("%v: unexpected result: %s", tc.name, expectedGot(e, a))
-		}
-	}
-}
+//if e, a := tc.reconcile, actual; e != a {
+//t.Errorf("%v: unexpected result: %s", tc.name, expectedGot(e, a))
+//}
+//}
+//}
 
 //// TestReconcileClusterServiceBrokerExistingServiceClassAndServicePlan
 //// verifies a simple, successful run of reconcileClusterServiceBroker() when a
@@ -1211,104 +1214,111 @@ func TestShouldReconcileServiceBroker(t *testing.T) {
 //}
 //}
 
-//func TestReconcileClusterServicePlanFromClusterServiceBrokerCatalog(t *testing.T) {
-//updatedPlan := func() *v1beta1.ClusterServicePlan {
-//p := getTestClusterServicePlan()
-//p.Spec.Description = "new-description"
-//p.Spec.ExternalName = "new-value"
-//p.Spec.Free = false
-//p.Spec.ExternalMetadata = &runtime.RawExtension{Raw: []byte(`{"field1": "value1"}`)}
-//p.Spec.ServiceInstanceCreateParameterSchema = &runtime.RawExtension{Raw: []byte(`{"field1": "value1"}`)}
-//p.Spec.ServiceInstanceUpdateParameterSchema = &runtime.RawExtension{Raw: []byte(`{"field1": "value1"}`)}
-//p.Spec.ServiceBindingCreateParameterSchema = &runtime.RawExtension{Raw: []byte(`{"field1": "value1"}`)}
+func TestReconcileServicePlanFromServiceBrokerCatalog(t *testing.T) {
+	updatedPlan := func() *v1beta1.ServicePlan {
+		p := getTestServicePlan()
+		p.Spec.Description = "new-description"
+		p.Spec.ExternalName = "new-value"
+		p.Spec.Free = false
+		p.Spec.ExternalMetadata = &runtime.RawExtension{Raw: []byte(`{"field1": "value1"}`)}
+		p.Spec.ServiceInstanceCreateParameterSchema = &runtime.RawExtension{Raw: []byte(`{"field1": "value1"}`)}
+		p.Spec.ServiceInstanceUpdateParameterSchema = &runtime.RawExtension{Raw: []byte(`{"field1": "value1"}`)}
+		p.Spec.ServiceBindingCreateParameterSchema = &runtime.RawExtension{Raw: []byte(`{"field1": "value1"}`)}
 
-//return p
-//}
+		return p
+	}
 
-//cases := []struct {
-//name                    string
-//newServicePlan          *v1beta1.ClusterServicePlan
-//existingServicePlan     *v1beta1.ClusterServicePlan
-//listerServicePlan       *v1beta1.ClusterServicePlan
-//shouldError             bool
-//errText                 *string
-//catalogClientPrepFunc   func(*fake.Clientset)
-//catalogActionsCheckFunc func(t *testing.T, name string, actions []clientgotesting.Action)
-//}{
-//{
-//name:           "new plan",
-//newServicePlan: getTestClusterServicePlan(),
-//shouldError:    false,
-//catalogActionsCheckFunc: func(t *testing.T, name string, actions []clientgotesting.Action) {
-//expectNumberOfActions(t, name, actions, 1)
-//expectCreate(t, name, actions[0], getTestClusterServicePlan())
-//},
-//},
-//{
-//name:                "exists, but for a different broker",
-//newServicePlan:      getTestClusterServicePlan(),
-//existingServicePlan: getTestClusterServicePlan(),
-//listerServicePlan: func() *v1beta1.ClusterServicePlan {
-//p := getTestClusterServicePlan()
-//p.Spec.ClusterServiceBrokerName = "something-else"
-//return p
-//}(),
-//shouldError: true,
-//errText:     strPtr(`ClusterServiceBroker "test-clusterservicebroker": ClusterServicePlan "test-clusterserviceplan" already exists for Broker "something-else"`),
-//},
-//{
-//name:                "plan update",
-//newServicePlan:      updatedPlan(),
-//existingServicePlan: getTestClusterServicePlan(),
-//shouldError:         false,
-//catalogActionsCheckFunc: func(t *testing.T, name string, actions []clientgotesting.Action) {
-//expectNumberOfActions(t, name, actions, 1)
-//expectUpdate(t, name, actions[0], updatedPlan())
-//},
-//},
-//{
-//name:                "plan update - failure",
-//newServicePlan:      updatedPlan(),
-//existingServicePlan: getTestClusterServicePlan(),
-//catalogClientPrepFunc: func(client *fake.Clientset) {
-//client.AddReactor("update", "clusterserviceplans", func(action clientgotesting.Action) (bool, runtime.Object, error) {
-//return true, nil, errors.New("oops")
-//})
-//},
-//shouldError: true,
-//errText:     strPtr("oops"),
-//},
-//}
+	cases := []struct {
+		name                    string
+		newServicePlan          *v1beta1.ServicePlan
+		existingServicePlan     *v1beta1.ServicePlan
+		listerServicePlan       *v1beta1.ServicePlan
+		shouldError             bool
+		errText                 *string
+		catalogClientPrepFunc   func(*fake.Clientset)
+		catalogActionsCheckFunc func(t *testing.T, name string, actions []clientgotesting.Action)
+	}{
+		{
+			name:           "new plan",
+			newServicePlan: getTestServicePlan(),
+			shouldError:    false,
+			catalogActionsCheckFunc: func(t *testing.T, name string, actions []clientgotesting.Action) {
+				expectNumberOfActions(t, name, actions, 1)
+				expectCreate(t, name, actions[0], getTestServicePlan())
+			},
+		},
+		{
+			name:                "exists, but for a different broker",
+			newServicePlan:      getTestServicePlan(),
+			existingServicePlan: getTestServicePlan(),
+			listerServicePlan: func() *v1beta1.ServicePlan {
+				p := getTestServicePlan()
+				p.Spec.ServiceBrokerName = "something-else"
+				return p
+			}(),
+			shouldError: true,
+			errText:     strPtr(`ServiceBroker "test-servicebroker": ServicePlan "test-serviceplan" already exists for Broker "something-else"`),
+		},
+		{
+			name:                "plan update",
+			newServicePlan:      updatedPlan(),
+			existingServicePlan: getTestServicePlan(),
+			shouldError:         false,
+			catalogActionsCheckFunc: func(t *testing.T, name string, actions []clientgotesting.Action) {
+				expectNumberOfActions(t, name, actions, 1)
+				expectUpdate(t, name, actions[0], updatedPlan())
+			},
+		},
+		{
+			name:                "plan update - failure",
+			newServicePlan:      updatedPlan(),
+			existingServicePlan: getTestServicePlan(),
+			catalogClientPrepFunc: func(client *fake.Clientset) {
+				client.AddReactor("update", "clusterserviceplans", func(action clientgotesting.Action) (bool, runtime.Object, error) {
+					return true, nil, errors.New("oops")
+				})
+			},
+			shouldError: true,
+			errText:     strPtr("oops"),
+		},
+	}
 
-//broker := getTestClusterServiceBroker()
+	broker := getTestServiceBroker()
 
-//for _, tc := range cases {
-//_, fakeCatalogClient, _, testController, sharedInformers := newTestController(t, noFakeActions())
-//if tc.catalogClientPrepFunc != nil {
-//tc.catalogClientPrepFunc(fakeCatalogClient)
-//}
+	for _, tc := range cases {
+		err := utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%v=true", scfeatures.NamespacedServiceBroker))
+		if err != nil {
+			t.Fatalf("Failed to enable namespaced service broker feature: %v", err)
+		}
+		defer utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%v=false", scfeatures.NamespacedServiceBroker))
 
-//if tc.listerServicePlan != nil {
-//sharedInformers.ClusterServicePlans().Informer().GetStore().Add(tc.listerServicePlan)
-//}
+		_, fakeCatalogClient, _, testController, sharedInformers := newTestController(t, noFakeActions())
+		if tc.catalogClientPrepFunc != nil {
+			tc.catalogClientPrepFunc(fakeCatalogClient)
+		}
 
-//err := testController.reconcileClusterServicePlanFromClusterServiceBrokerCatalog(broker, tc.newServicePlan, tc.existingServicePlan)
-//if err != nil {
-//if !tc.shouldError {
-//t.Errorf("%v: unexpected error from method under test: %v", tc.name, err)
-//continue
-//} else if tc.errText != nil && *tc.errText != err.Error() {
-//t.Errorf("%v: unexpected error text from method under test; %s", tc.name, expectedGot(tc.errText, err.Error()))
-//continue
-//}
-//}
+		if tc.listerServicePlan != nil {
+			t.Log("NSK: listerServicePlan was nil!")
+			sharedInformers.ServicePlans().Informer().GetStore().Add(tc.listerServicePlan)
+		}
 
-//if tc.catalogActionsCheckFunc != nil {
-//actions := fakeCatalogClient.Actions()
-//tc.catalogActionsCheckFunc(t, tc.name, actions)
-//}
-//}
-//}
+		err = testController.reconcileServicePlanFromServiceBrokerCatalog(broker, tc.newServicePlan, tc.existingServicePlan)
+		if err != nil {
+			if !tc.shouldError {
+				t.Errorf("%v: unexpected error from method under test: %v", tc.name, err)
+				continue
+			} else if tc.errText != nil && *tc.errText != err.Error() {
+				t.Errorf("%v: unexpected error text from method under test; %s", tc.name, expectedGot(tc.errText, err.Error()))
+				continue
+			}
+		}
+
+		if tc.catalogActionsCheckFunc != nil {
+			actions := fakeCatalogClient.Actions()
+			tc.catalogActionsCheckFunc(t, tc.name, actions)
+		}
+	}
+}
 
 //func reconcileClusterServiceBroker(t *testing.T, testController *controller, broker *v1beta1.ClusterServiceBroker) error {
 //clone := broker.DeepCopy()

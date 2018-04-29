@@ -59,8 +59,8 @@ import (
 // loops for the different catalog API resources.
 
 const (
-	//testClusterServiceClassGUID            = "CSCGUID"
-	//testClusterServicePlanGUID             = "CSPGUID"
+	testServiceClassGUID = "SCGUID"
+	testServicePlanGUID  = "SPGUID"
 	//testNonbindableClusterServiceClassGUID = "UNBINDABLE-CLUSTERSERVICECLASS"
 	//testNonbindableClusterServicePlanGUID  = "UNBINDABLE-CLUSTERSERVICEPLAN"
 	//testServiceInstanceGUID                = "IGUID"
@@ -71,8 +71,9 @@ const (
 
 	testServiceBrokerName = "test-servicebroker"
 
-//testClusterServiceClassName             = "test-clusterserviceclass"
-//testClusterServicePlanName              = "test-clusterserviceplan"
+	//testClusterServiceClassName             = "test-clusterserviceclass"
+	testServicePlanName = "test-serviceplan"
+
 //testNonExistentClusterServiceClassName  = "nothere"
 //testNonbindableClusterServiceClassName  = "test-unbindable-clusterserviceclass"
 //testNonbindableClusterServicePlanName   = "test-unbindable-clusterserviceplan"
@@ -590,26 +591,31 @@ func getTestServiceBrokerWithStatusAndTime(status v1beta1.ConditionStatus, lastT
 //}
 //}
 
-//func getTestClusterServicePlan() *v1beta1.ClusterServicePlan {
-//return &v1beta1.ClusterServicePlan{
-//ObjectMeta: metav1.ObjectMeta{Name: testClusterServicePlanGUID},
-//Spec: v1beta1.ClusterServicePlanSpec{
-//ClusterServiceBrokerName: testClusterServiceBrokerName,
-//CommonServicePlanSpec: v1beta1.CommonServicePlanSpec{
-//ExternalID:   testClusterServicePlanGUID,
-//ExternalName: testClusterServicePlanName,
-//Bindable:     truePtr(),
-//},
-//ClusterServiceClassRef: v1beta1.ClusterObjectReference{
-//Name: testClusterServiceClassGUID,
-//},
-//},
-//Status: v1beta1.ClusterServicePlanStatus{},
-//}
-//}
+func getTestCommonServicePlanSpec() v1beta1.CommonServicePlanSpec {
+	return v1beta1.CommonServicePlanSpec{
+		ExternalID:   testServicePlanGUID,
+		ExternalName: testServicePlanName,
+		Bindable:     truePtr(),
+	}
+}
+
+func getTestServicePlan() *v1beta1.ServicePlan {
+	return &v1beta1.ServicePlan{
+		ObjectMeta: metav1.ObjectMeta{Name: testServicePlanGUID},
+		Spec: v1beta1.ServicePlanSpec{
+			ServiceBrokerName:     testServiceBrokerName,
+			CommonServicePlanSpec: getTestCommonServicePlanSpec(),
+			ServiceClassRef: v1beta1.LocalObjectReference{
+				Name: testServiceClassGUID,
+			},
+		},
+		Status: v1beta1.ServicePlanStatus{},
+	}
+}
 
 //func getTestMarkedAsRemovedClusterServicePlan() *v1beta1.ClusterServicePlan {
 //return &v1beta1.ClusterServicePlan{
+
 //ObjectMeta: metav1.ObjectMeta{Name: testRemovedClusterServicePlanGUID},
 //Spec: v1beta1.ClusterServicePlanSpec{
 //ClusterServiceBrokerName: testClusterServiceBrokerName,
