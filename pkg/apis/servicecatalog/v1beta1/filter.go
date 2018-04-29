@@ -24,7 +24,7 @@ import (
 // These are functions to support filtering. This is where we can add more fields
 // to the labels.Set to support other kinds of catalog filtering.
 
-// ConvertCommonServiceClassToProperties takes a Service Class and pulls out the
+// ConvertServiceClassToProperties takes a Service Class and pulls out the
 // properties we support for filtering, converting them into a map in the
 // expected format.
 func ConvertServiceClassToProperties(serviceClass *ServiceClass) filter.Properties {
