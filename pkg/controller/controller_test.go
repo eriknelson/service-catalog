@@ -717,15 +717,22 @@ func getTestCatalog() *osb.CatalogResponse {
 // as ClusterServiceClassRef and ClusterServicePlanRef which means that the
 // ClusterServiceClass and ClusterServicePlan are fetched using
 // Service[Class|Plan]Lister.get(spec.Service[Class|Plan]Ref.Name)
-func getTestServiceInstanceWithRefs() *v1beta1.ServiceInstance {
+func getTestServiceInstanceWithClusterRefs() *v1beta1.ServiceInstance {
 	sc := getTestServiceInstance()
 	sc.Spec.ClusterServiceClassRef = &v1beta1.ClusterObjectReference{Name: testClusterServiceClassGUID}
 	sc.Spec.ClusterServicePlanRef = &v1beta1.ClusterObjectReference{Name: testClusterServicePlanGUID}
 	return sc
 }
 
+func getTestServiceInstanceWithNamespacedRefs() *v1beta1.ServiceInstance {
+	sc := getTestServiceInstanceNamespacedPlanRef()
+	sc.Spec.ServiceClassRef = &v1beta1.LocalObjectReference{Name: testServiceClassGUID}
+	sc.Spec.ServicePlanRef = &v1beta1.LocalObjectReference{Name: testServicePlanGUID}
+	return sc
+}
+
 func getTestServiceInstanceWithRefsAndExternalProperties() *v1beta1.ServiceInstance {
-	sc := getTestServiceInstanceWithRefs()
+	sc := getTestServiceInstanceWithClusterRefs()
 	sc.Status.ExternalProperties = &v1beta1.ServiceInstancePropertiesState{
 		ClusterServicePlanExternalID:   testClusterServicePlanGUID,
 		ClusterServicePlanExternalName: testClusterServicePlanName,
@@ -750,6 +757,32 @@ func getTestServiceInstance() *v1beta1.ServiceInstance {
 			PlanReference: v1beta1.PlanReference{
 				ClusterServiceClassExternalName: testClusterServiceClassName,
 				ClusterServicePlanExternalName:  testClusterServicePlanName,
+			},
+			ExternalID: testServiceInstanceGUID,
+		},
+		Status: v1beta1.ServiceInstanceStatus{
+			DeprovisionStatus: v1beta1.ServiceInstanceDeprovisionStatusRequired,
+		},
+	}
+}
+
+// instance referencing the result of getTestServiceClass()
+// and getTestServicePlan()
+// This version sets:
+// ServiceClassExternalName and ServicePlanExternalName, so depending on the
+// test, you may need to add reactors that deal with List due to the need
+// to resolve Names to IDs for both ServiceClass and ServicePlan
+func getTestServiceInstanceNamespacedPlanRef() *v1beta1.ServiceInstance {
+	return &v1beta1.ServiceInstance{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       testServiceInstanceName,
+			Namespace:  testNamespace,
+			Generation: 1,
+		},
+		Spec: v1beta1.ServiceInstanceSpec{
+			PlanReference: v1beta1.PlanReference{
+				ServiceClassExternalName: testServiceClassName,
+				ServicePlanExternalName:  testServicePlanName,
 			},
 			ExternalID: testServiceInstanceGUID,
 		},
@@ -801,7 +834,7 @@ func getTestServiceInstanceNonbindableServiceBindablePlan() *v1beta1.ServiceInst
 }
 
 func getTestServiceInstanceBindableServiceNonbindablePlan() *v1beta1.ServiceInstance {
-	i := getTestServiceInstanceWithRefs()
+	i := getTestServiceInstanceWithClusterRefs()
 	i.Spec.ClusterServicePlanExternalName = testNonbindableClusterServicePlanName
 	i.Spec.ClusterServicePlanRef = &v1beta1.ClusterObjectReference{Name: testNonbindableClusterServicePlanGUID}
 
@@ -819,7 +852,7 @@ func getTestServiceInstanceWithStatus(status v1beta1.ConditionStatus) *v1beta1.S
 }
 
 func getTestServiceInstanceWithFailedStatus() *v1beta1.ServiceInstance {
-	instance := getTestServiceInstanceWithRefs()
+	instance := getTestServiceInstanceWithClusterRefs()
 	instance.Status = v1beta1.ServiceInstanceStatus{
 		Conditions: []v1beta1.ServiceInstanceCondition{{
 			Type:   v1beta1.ServiceInstanceConditionFailed,
@@ -831,7 +864,7 @@ func getTestServiceInstanceWithFailedStatus() *v1beta1.ServiceInstance {
 }
 
 func getTestServiceInstanceUpdatingPlan() *v1beta1.ServiceInstance {
-	instance := getTestServiceInstanceWithRefs()
+	instance := getTestServiceInstanceWithClusterRefs()
 	instance.Generation = 2
 	instance.Status = v1beta1.ServiceInstanceStatus{
 		Conditions: []v1beta1.ServiceInstanceCondition{{
@@ -853,7 +886,7 @@ func getTestServiceInstanceUpdatingPlan() *v1beta1.ServiceInstance {
 }
 
 func getTestServiceInstanceUpdatingParametersOfDeletedPlan() *v1beta1.ServiceInstance {
-	instance := getTestServiceInstanceWithRefs()
+	instance := getTestServiceInstanceWithClusterRefs()
 	instance.Generation = 2
 	instance.Status = v1beta1.ServiceInstanceStatus{
 		Conditions: []v1beta1.ServiceInstanceCondition{{
@@ -876,7 +909,7 @@ func getTestServiceInstanceUpdatingParametersOfDeletedPlan() *v1beta1.ServiceIns
 
 // getTestServiceInstanceAsync returns an instance in async mode
 func getTestServiceInstanceAsyncProvisioning(operation string) *v1beta1.ServiceInstance {
-	instance := getTestServiceInstanceWithRefs()
+	instance := getTestServiceInstanceWithClusterRefs()
 
 	operationStartTime := metav1.NewTime(time.Now().Add(-1 * time.Hour))
 	instance.Status = v1beta1.ServiceInstanceStatus{
@@ -906,7 +939,7 @@ func getTestServiceInstanceAsyncProvisioning(operation string) *v1beta1.ServiceI
 // getTestServiceInstanceAsyncUpdating returns an instance for which there is an
 // in-progress async update
 func getTestServiceInstanceAsyncUpdating(operation string) *v1beta1.ServiceInstance {
-	instance := getTestServiceInstanceWithRefs()
+	instance := getTestServiceInstanceWithClusterRefs()
 	instance.Generation = 2
 
 	operationStartTime := metav1.NewTime(time.Now().Add(-1 * time.Hour))
@@ -941,7 +974,7 @@ func getTestServiceInstanceAsyncUpdating(operation string) *v1beta1.ServiceInsta
 }
 
 func getTestServiceInstanceAsyncDeprovisioning(operation string) *v1beta1.ServiceInstance {
-	instance := getTestServiceInstanceWithRefs()
+	instance := getTestServiceInstanceWithClusterRefs()
 	instance.Generation = 2
 
 	operationStartTime := metav1.NewTime(time.Now().Add(-1 * time.Hour))
