@@ -724,6 +724,13 @@ func getTestServiceInstanceWithClusterRefs() *v1beta1.ServiceInstance {
 	return sc
 }
 
+func getTestServiceInstanceWithNamespacedRefs() *v1beta1.ServiceInstance {
+	sc := getTestServiceInstanceNamespacedPlanRef()
+	sc.Spec.ServiceClassRef = &v1beta1.LocalObjectReference{Name: testServiceClassGUID}
+	sc.Spec.ServicePlanRef = &v1beta1.LocalObjectReference{Name: testServicePlanGUID}
+	return sc
+}
+
 func getTestServiceInstanceWithRefsAndExternalProperties() *v1beta1.ServiceInstance {
 	sc := getTestServiceInstanceWithClusterRefs()
 	sc.Status.ExternalProperties = &v1beta1.ServiceInstancePropertiesState{
@@ -750,6 +757,32 @@ func getTestServiceInstance() *v1beta1.ServiceInstance {
 			PlanReference: v1beta1.PlanReference{
 				ClusterServiceClassExternalName: testClusterServiceClassName,
 				ClusterServicePlanExternalName:  testClusterServicePlanName,
+			},
+			ExternalID: testServiceInstanceGUID,
+		},
+		Status: v1beta1.ServiceInstanceStatus{
+			DeprovisionStatus: v1beta1.ServiceInstanceDeprovisionStatusRequired,
+		},
+	}
+}
+
+// instance referencing the result of getTestServiceClass()
+// and getTestServicePlan()
+// This version sets:
+// ServiceClassExternalName and ServicePlanExternalName, so depending on the
+// test, you may need to add reactors that deal with List due to the need
+// to resolve Names to IDs for both ServiceClass and ServicePlan
+func getTestServiceInstanceNamespacedPlanRef() *v1beta1.ServiceInstance {
+	return &v1beta1.ServiceInstance{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       testServiceInstanceName,
+			Namespace:  testNamespace,
+			Generation: 1,
+		},
+		Spec: v1beta1.ServiceInstanceSpec{
+			PlanReference: v1beta1.PlanReference{
+				ServiceClassExternalName: testServiceClassName,
+				ServicePlanExternalName:  testServicePlanName,
 			},
 			ExternalID: testServiceInstanceGUID,
 		},
@@ -2811,7 +2844,7 @@ func assertServiceInstanceInProgressPropertiesPlan(t *testing.T, obj runtime.Obj
 	if !ok {
 		fatalf(t, "Couldn't convert object %+v into a *v1beta1.ServiceInstance", obj)
 	}
-	assertServiceInstancePropertiesStatePlan(t, "in-progress", instance.Status.InProgressProperties, planName, planID)
+	assertServiceInstancePropertiesStatePlan(t, "in-progress", instance, instance.Status.InProgressProperties, planName, planID)
 }
 
 func assertServiceInstanceInProgressPropertiesParameters(t *testing.T, obj runtime.Object, params map[string]interface{}, checksum string) {
@@ -2850,7 +2883,7 @@ func assertServiceInstanceExternalPropertiesPlan(t *testing.T, obj runtime.Objec
 	if !ok {
 		fatalf(t, "Couldn't convert object %+v into a *v1beta1.ServiceInstance", obj)
 	}
-	assertServiceInstancePropertiesStatePlan(t, "external", instance.Status.ExternalProperties, planName, planID)
+	assertServiceInstancePropertiesStatePlan(t, "external", instance, instance.Status.ExternalProperties, planName, planID)
 }
 
 func assertServiceInstanceExternalPropertiesParameters(t *testing.T, obj runtime.Object, params map[string]interface{}, checksum string) {
@@ -2873,16 +2906,27 @@ func assertServiceInstanceExternalPropertiesUnchanged(t *testing.T, obj runtime.
 	}
 }
 
-func assertServiceInstancePropertiesStatePlan(t *testing.T, propsLabel string, actualProps *v1beta1.ServiceInstancePropertiesState, expectedPlanName string, expectedPlanID string) {
+func assertServiceInstancePropertiesStatePlan(t *testing.T, propsLabel string, instance *v1beta1.ServiceInstance, actualProps *v1beta1.ServiceInstancePropertiesState, expectedPlanName string, expectedPlanID string) {
 	if actualProps == nil {
 		fatalf(t, "expected %v properties to not be nil", propsLabel)
 	}
-	if e, a := expectedPlanName, actualProps.ClusterServicePlanExternalName; e != a {
-		fatalf(t, "unexpected %v properties external service plan name: expected %v, actual %v", propsLabel, e, a)
+
+	if instance.Spec.ClusterServicePlanSpecified() {
+		if e, a := expectedPlanName, actualProps.ClusterServicePlanExternalName; e != a {
+			fatalf(t, "unexpected %v properties external service plan name: expected %v, actual %v", propsLabel, e, a)
+		}
+		if e, a := expectedPlanID, actualProps.ClusterServicePlanExternalID; e != a {
+			fatalf(t, "unexpected %v properties external service plan ID: expected %v, actual %v", propsLabel, e, a)
+		}
+	} else {
+		if e, a := expectedPlanName, actualProps.ServicePlanExternalName; e != a {
+			fatalf(t, "unexpected %v properties external service plan name: expected %v, actual %v", propsLabel, e, a)
+		}
+		if e, a := expectedPlanID, actualProps.ServicePlanExternalID; e != a {
+			fatalf(t, "unexpected %v properties external service plan ID: expected %v, actual %v", propsLabel, e, a)
+		}
 	}
-	if e, a := expectedPlanID, actualProps.ClusterServicePlanExternalID; e != a {
-		fatalf(t, "unexpected %v properties external service plan ID: expected %v, actual %v", propsLabel, e, a)
-	}
+
 }
 
 func assertServiceInstancePropertiesStateParameters(t *testing.T, propsLabel string, actualProps *v1beta1.ServiceInstancePropertiesState, expectedParams map[string]interface{}, expectedChecksum string) {
@@ -3456,8 +3500,8 @@ func testCatalogFinalizerExists(t *testing.T, name string, f failfFunc, obj runt
 	return true
 }
 
-func assertNumberOfClusterServiceBrokerActions(t *testing.T, actions []fakeosb.Action, number int) {
-	testNumberOfClusterServiceBrokerActions(t, "" /* name */, fatalf, actions, number)
+func assertNumberOfBrokerActions(t *testing.T, actions []fakeosb.Action, number int) {
+	testNumberOfBrokerActions(t, "" /* name */, fatalf, actions, number)
 }
 
 // assertListRestrictions compares expected Fields / Labels on a list options.
@@ -3471,10 +3515,10 @@ func assertListRestrictions(t *testing.T, e, a clientgotesting.ListRestrictions)
 }
 
 func expectNumberOfClusterServiceBrokerActions(t *testing.T, name string, actions []fakeosb.Action, number int) bool {
-	return testNumberOfClusterServiceBrokerActions(t, name, errorf, actions, number)
+	return testNumberOfBrokerActions(t, name, errorf, actions, number)
 }
 
-func testNumberOfClusterServiceBrokerActions(t *testing.T, name string, f failfFunc, actions []fakeosb.Action, number int) bool {
+func testNumberOfBrokerActions(t *testing.T, name string, f failfFunc, actions []fakeosb.Action, number int) bool {
 	logContext := ""
 	if len(name) > 0 {
 		logContext = name + ": "
