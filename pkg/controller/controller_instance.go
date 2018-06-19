@@ -709,7 +709,13 @@ func (c *controller) pollServiceInstance(instance *v1beta1.ServiceInstance) erro
 
 	instance = instance.DeepCopy()
 
-	_, _, _, brokerClient, err := c.getClusterServiceClassPlanAndClusterServiceBroker(instance)
+	var brokerClient osb.Client
+	var err error
+	if instance.Spec.ClusterServiceClassSpecified() {
+		_, _, _, brokerClient, err = c.getClusterServiceClassPlanAndClusterServiceBroker(instance)
+	} else {
+		_, _, _, brokerClient, err = c.getServiceClassPlanAndServiceBroker(instance)
+	}
 	if err != nil {
 		return c.handleServiceInstanceReconciliationError(instance, err)
 	}

@@ -3579,6 +3579,12 @@ func assertPollLastOperation(t *testing.T, action fakeosb.Action, request *osb.L
 	}
 
 	if e, a := request, action.Request; !reflect.DeepEqual(e, a) {
+		actionRequest := action.Request.(*osb.LastOperationRequest)
+
+		t.Logf("Request - ServiceID: %s", *request.ServiceID)
+		t.Logf("Action - ServiceID: %s", *actionRequest.ServiceID)
+		t.Logf("Request - PlanID: %s", *request.PlanID)
+		t.Logf("Action - PlanID: %s", *actionRequest.PlanID)
 		fatalf(t, "unexpected diff in last operation request: %v\nexpected %+v\ngot      %+v", diff.ObjectReflectDiff(e, a), e, a)
 	}
 }
