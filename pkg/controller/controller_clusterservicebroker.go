@@ -155,6 +155,7 @@ func (c *controller) reconcileClusterServiceBrokerKey(key string) error {
 	pcb := pretty.NewContextBuilder(pretty.ClusterServiceBroker, "", key, "")
 	if errors.IsNotFound(err) {
 		glog.Info(pcb.Message("Not doing work because it has been deleted"))
+		c.brokerClientManager.RemoveBrokerClient(NewClusterServiceBrokerKey(key))
 		return nil
 	}
 	if err != nil {
@@ -194,8 +195,7 @@ func (c *controller) reconcileClusterServiceBroker(broker *v1beta1.ClusterServic
 
 		clientConfig := NewClientConfigurationForBroker(broker.ObjectMeta, &broker.Spec.CommonServiceBrokerSpec, authConfig)
 
-		glog.V(4).Info(pcb.Messagef("Creating client, URL: %v", broker.Spec.URL))
-		brokerClient, err := c.brokerClientCreateFunc(clientConfig)
+		brokerClient, err := c.brokerClientManager.UpdateBrokerClient(NewClusterServiceBrokerKey(broker.Name), clientConfig)
 		if err != nil {
 			s := fmt.Sprintf("Error creating client for broker %q: %s", broker.Name, err)
 			glog.Info(pcb.Message(s))

@@ -150,6 +150,7 @@ func (c *controller) reconcileServiceBrokerKey(key string) error {
 	broker, err := c.serviceBrokerLister.ServiceBrokers(namespace).Get(name)
 	if errors.IsNotFound(err) {
 		glog.Info(pcb.Message("Not doing work because the ServiceBroker has been deleted"))
+		c.brokerClientManager.RemoveBrokerClient(NewServiceBrokerKey(namespace, name))
 		return nil
 	}
 	if err != nil {
@@ -190,8 +191,7 @@ func (c *controller) reconcileServiceBroker(broker *v1beta1.ServiceBroker) error
 		// clientConfig := NewClientConfigurationForBroker(broker, authConfig)
 		clientConfig := NewClientConfigurationForBroker(broker.ObjectMeta, &broker.Spec.CommonServiceBrokerSpec, authConfig)
 
-		glog.V(4).Info(pcb.Messagef("Creating client, URL: %v", broker.Spec.URL))
-		brokerClient, err := c.brokerClientCreateFunc(clientConfig)
+		brokerClient, err := c.brokerClientManager.UpdateBrokerClient(NewClusterServiceBrokerKey(broker.Name), clientConfig)
 		if err != nil {
 			s := fmt.Sprintf("Error creating client for broker %q: %s", broker.Name, err)
 			glog.Info(pcb.Message(s))

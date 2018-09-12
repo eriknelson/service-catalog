@@ -179,65 +179,6 @@ func TestReconcileServiceInstanceNonExistentClusterServiceBroker(t *testing.T) {
 	}
 }
 
-// TestReconcileServiceInstanceWithAuthError tests reconcileInstance when Kube Client
-// fails to locate the broker authentication secret.
-func TestReconcileServiceInstanceWithAuthError(t *testing.T) {
-	fakeKubeClient, fakeCatalogClient, fakeClusterServiceBrokerClient, testController, sharedInformers := newTestController(t, noFakeActions())
-
-	broker := getTestClusterServiceBroker()
-	broker.Spec.AuthInfo = &v1beta1.ClusterServiceBrokerAuthInfo{
-		Basic: &v1beta1.ClusterBasicAuthConfig{
-			SecretRef: &v1beta1.ObjectReference{
-				Namespace: "does_not_exist",
-				Name:      "auth-name",
-			},
-		},
-	}
-	sharedInformers.ClusterServiceBrokers().Informer().GetStore().Add(broker)
-	sharedInformers.ClusterServiceClasses().Informer().GetStore().Add(getTestClusterServiceClass())
-	sharedInformers.ClusterServicePlans().Informer().GetStore().Add(getTestClusterServicePlan())
-
-	instance := getTestServiceInstanceWithClusterRefs()
-
-	fakeKubeClient.AddReactor("get", "secrets", func(action clientgotesting.Action) (bool, runtime.Object, error) {
-		return true, nil, errors.New("no secret defined")
-	})
-
-	if err := reconcileServiceInstance(t, testController, instance); err == nil {
-		t.Fatal("There was no secret to be found, but does_not_exist/auth-name was found.")
-	}
-
-	// verify that no broker actions occurred
-	brokerActions := fakeClusterServiceBrokerClient.Actions()
-	assertNumberOfBrokerActions(t, brokerActions, 0)
-
-	// verify that one catalog client action occurred
-	actions := fakeCatalogClient.Actions()
-	assertNumberOfActions(t, actions, 1)
-
-	// There should only be one action that says it failed fetching auth credentials.
-	updatedServiceInstance := assertUpdateStatus(t, actions[0], instance)
-	assertServiceInstanceErrorBeforeRequest(t, updatedServiceInstance, errorAuthCredentialsReason, instance)
-
-	// verify one kube action occurred
-	kubeActions := fakeKubeClient.Actions()
-	if err := checkKubeClientActions(kubeActions, []kubeClientAction{
-		{verb: "get", resourceName: "secrets", checkType: checkGetActionType},
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	// verify that one event was emitted
-	events := getRecordedEvents(testController)
-	expectedEvent := warningEventBuilder(errorAuthCredentialsReason).msgf(
-		"Error getting broker auth credentials for broker %q:",
-		"test-clusterservicebroker",
-	).msg("no secret defined")
-	if err := checkEvents(events, expectedEvent.stringArr()); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // TestReconcileServiceInstanceNonExistentClusterServicePlan tests that reconcileInstance
 // fails when service class points at a non-existent service plan
 func TestReconcileServiceInstanceNonExistentClusterServicePlan(t *testing.T) {
